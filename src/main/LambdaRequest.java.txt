@@ -1,0 +1,8 @@
+package com.example.lambdas3documentum;
+
+public class LambdaRequest {
+    private String bucketName;
+    private String folderName;
+
+    // Getters and setters
+}

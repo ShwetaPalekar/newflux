@@ -1,0 +1,74 @@
+package com.example.lambdas3documentum.service;
+
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.S3Object;
+import com.documentum.fc.client.DfClient;
+import com.documentum.fc.client.IDfClient;
+import com.documentum.fc.client.IDfSession;
+import com.documentum.fc.client.IDfSessionManager;
+import com.documentum.fc.common.DfLoginInfo;
+import com.documentum.fc.common.IDfLoginInfo;
+import com.documentum.fc.common.IDfSysObject;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.io.InputStream;
+import java.util.List;
+
+@Service
+public class DocumentumService {
+
+    @Autowired
+    private AmazonS3 amazonS3;
+
+    public void streamFilesToDocumentum(List<String> keys, String bucketName) {
+        try {
+            IDfClient client = DfClient.getLocalClient();
+            IDfSessionManager sessionManager = client.newSessionManager();
+            IDfLoginInfo loginInfo = new DfLoginInfo();
+            loginInfo.setUser("username");
+            loginInfo.setPassword("password");
+            sessionManager.setIdentity("repo", loginInfo);
+
+            Flux.fromIterable(keys)
+                    .flatMap(key -> processFile(sessionManager, bucketName, key))
+                    .doOnError(Throwable::printStackTrace)
+                    .blockLast(); // Wait for all files to be processed
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private Mono<Void> processFile(IDfSessionManager sessionManager, String bucketName, String key) {
+        return Mono.fromCallable(() -> {
+            IDfSession session = sessionManager.getSession("repo");
+            S3Object s3Object = amazonS3.getObject(bucketName, key);
+            InputStream inputStream = s3Object.getObjectContent();
+
+            saveFileToDocumentum(session, inputStream, key);
+
+            sessionManager.release(session);
+            return Mono.empty();
+        }).subscribeOn(Schedulers.boundedElastic()).then();
+    }
+
+    private void saveFileToDocumentum(IDfSession session, InputStream inputStream, String key) {
+        try {
+            // Assuming you have a method to create an object in Documentum
+            // Replace this with your actual Documentum file saving logic
+
+            // Example: Create a new document and set its content
+            IDfSysObject newDoc = (IDfSysObject) session.newObject("dm_document");
+            newDoc.setObjectName(key);
+            newDoc.setContentType("application/octet-stream");
+            newDoc.setContent(inputStream);
+            newDoc.save();
+
+            System.out.println("Saved file to Documentum: " + key);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}

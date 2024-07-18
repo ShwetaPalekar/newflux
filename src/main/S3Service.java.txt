@@ -1,0 +1,28 @@
+package com.example.lambdas3documentum.service;
+
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.ListObjectsV2Request;
+import com.amazonaws.services.s3.model.S3ObjectSummary;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+public class S3Service {
+
+    @Autowired
+    private AmazonS3 amazonS3;
+
+    public List<String> listFilesInBucket(String bucketName, String folderName) {
+        ListObjectsV2Request request = new ListObjectsV2Request()
+                .withBucketName(bucketName)
+                .withPrefix(folderName);
+        return amazonS3.listObjectsV2(request)
+                .getObjectSummaries()
+                .stream()
+                .map(S3ObjectSummary::getKey)
+                .collect(Collectors.toList());
+    }
+}
