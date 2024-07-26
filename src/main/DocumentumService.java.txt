@@ -82,7 +82,12 @@ public class DocumentumService {
             newDoc.setContentType("application/octet-stream");
             newDoc.setContent(new ByteArrayInputStream(content));
             newDoc.save();
-
+            IDfSysObject sysObject = (IDfSysObject) session.newObject("dm_document");
+            sysObject.setObjectName(fileName);
+            sysObject.setContentType("pdf"); // or other appropriate content type
+            sysObject.setFile(fileName); // Set a file path if required for the object
+            sysObject.setContent(fileContent); // Set the InputStream as content
+            sysObject.save();
             System.out.println("Saved file to Documentum: " + key);
         } catch (Exception e) {
             System.err.println("Error saving file to Documentum: " + key);
