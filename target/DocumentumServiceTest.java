@@ -1,157 +1,100 @@
-package com.example.lambdas3documentum.service;
-
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.S3Object;
-import com.documentum.fc.client.IDfSession;
-import com.documentum.fc.client.IDfSessionManager;
-import com.documentum.fc.common.IDfSysObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
+import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class DocumentumServiceTest {
-
-    @Mock
-    private AmazonS3 amazonS3;
-
-    @Mock
-    private IDfSessionManager sessionManager;
-
-    @Mock
-    private IDfSession session;
-
-    @Mock
-    private IDfSysObject sysObject;
+public class DocumentumServiceTest {
 
     @InjectMocks
     private DocumentumService documentumService;
 
+    @Mock
+    private S3Service s3Service;
+
+    @Mock
+    private IDfSessionFactory sessionFactory;
+
+    @Mock
+    private IDfSession session;
+
     @BeforeEach
-    void setUp() throws Exception {
-        when(sessionManager.getSession(anyString())).thenReturn(session);
-        when(session.newObject(anyString())).thenReturn(sysObject);
+    public void setUp() {
+        when(sessionFactory.getSession(anyString())).thenReturn(session);
     }
 
     @Test
-    void testStreamFilesToDocumentum() throws Exception {
+    public void testStreamFilesToDocumentum_Success() {
+        String token = "test-token";
         List<String> keys = Arrays.asList("file1", "file2");
         String bucketName = "test-bucket";
 
-        documentumService.streamFilesToDocumentum(keys, bucketName);
-
-        verify(sessionManager, times(1)).getSession(anyString());
-        verify(sessionManager, times(2)).release(session); // Ensure session is released for each file
-        verify(amazonS3, times(keys.size())).getObject(anyString(), anyString());
-    }
-
-    @Test
-    void testStreamFilesToDocumentumWithError() throws Exception {
-        List<String> keys = Arrays.asList("file1", "file2");
-        String bucketName = "test-bucket";
-        when(sessionManager.getSession(anyString())).thenThrow(new RuntimeException("Session error"));
-
-        assertThrows(RuntimeException.class, () -> documentumService.streamFilesToDocumentum(keys, bucketName));
-
-        verify(sessionManager, times(1)).getSession(anyString());
-    }
-
-    @Test
-    void testProcessFile() {
-        String bucketName = "test-bucket";
-        String key = "file1";
         S3Object s3Object = mock(S3Object.class);
-        InputStream inputStream = new ByteArrayInputStream(new byte[]{});
-        when(amazonS3.getObject(bucketName, key)).thenReturn(s3Object);
+        InputStream inputStream = new ByteArrayInputStream("test-content".getBytes());
+
+        when(s3Service.getObject(bucketName, "file1")).thenReturn(s3Object);
+        when(s3Service.getObject(bucketName, "file2")).thenReturn(s3Object);
         when(s3Object.getObjectContent()).thenReturn(inputStream);
 
-        Mono<Void> result = documentumService.processFile(session, bucketName, key);
+        Boolean result = documentumService.streamFilesToDocumentum(token, keys, bucketName);
 
-        verify(amazonS3, times(1)).getObject(bucketName, key);
-        verify(sessionManager, times(1)).release(session);
-        assertEquals(Mono.empty(), result);
+        assertTrue(result);
+        verify(s3Service, times(1)).getObject(bucketName, "file1");
+        verify(s3Service, times(1)).getObject(bucketName, "file2");
+        verify(sessionFactory, times(1)).closeSession(session);
     }
 
     @Test
-    void testProcessFileWithError() {
+    public void testStreamFilesToDocumentum_Exception() {
+        String token = "test-token";
+        List<String> keys = Arrays.asList("file1");
         String bucketName = "test-bucket";
-        String key = "file1";
-        when(amazonS3.getObject(bucketName, key)).thenThrow(new RuntimeException("S3 error"));
 
-        assertThrows(RuntimeException.class, () -> documentumService.processFile(session, bucketName, key).block());
+        when(s3Service.getObject(bucketName, "file1")).thenThrow(new RuntimeException("S3 error"));
 
-        verify(amazonS3, times(1)).getObject(bucketName, key);
-        verify(sessionManager, times(1)).release(session);
+        Boolean result = documentumService.streamFilesToDocumentum(token, keys, bucketName);
+
+        assertFalse(result);
+        verify(s3Service, times(1)).getObject(bucketName, "file1");
+        verify(sessionFactory, times(1)).closeSession(session);
     }
 
     @Test
-    void testSaveFileToDocumentum() throws Exception {
-        String key = "file1";
-        InputStream inputStream = new ByteArrayInputStream(new byte[]{1, 2, 3, 4});
+    public void testSaveFileToDocumentum_Success() throws Exception {
+        InputStream inputStream = new ByteArrayInputStream("test-content".getBytes());
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 
-        documentumService.saveFileToDocumentum(session, inputStream, key);
+        IDfDocument newDoc = mock(IDfDocument.class);
+        when(session.newObject("dm_document")).thenReturn(newDoc);
 
-        ArgumentCaptor<byte[]> contentCaptor = ArgumentCaptor.forClass(byte[].class);
-        verify(sysObject).setObjectName(key);
-        verify(sysObject).setContentType("application/octet-stream");
-        verify(sysObject).setContent(contentCaptor.capture());
-        verify(sysObject).save();
+        documentumService.saveFileToDocumentum(session, inputStream, "file1");
 
-        byte[] savedContent = contentCaptor.getValue();
-        assertEquals(4, savedContent.length);
-        assertEquals(1, savedContent[0]);
-        assertEquals(2, savedContent[1]);
-        assertEquals(3, savedContent[2]);
-        assertEquals(4, savedContent[3]);
+        verify(newDoc, times(1)).setObjectName("file1");
+        verify(newDoc, times(1)).setContent(buffer);
+        verify(newDoc, times(1)).save();
     }
 
     @Test
-    void testSaveFileToDocumentumWithError() throws Exception {
-        String key = "file1";
-        InputStream inputStream = new ByteArrayInputStream(new byte[]{1, 2, 3, 4});
-        doThrow(new IOException("IO error")).when(sysObject).save();
+    public void testSaveFileToDocumentum_Exception() throws Exception {
+        InputStream inputStream = new ByteArrayInputStream("test-content".getBytes());
 
-        documentumService.saveFileToDocumentum(session, inputStream, key);
+        doThrow(new RuntimeException("Save error")).when(session).newObject("dm_document");
 
-        ArgumentCaptor<byte[]> contentCaptor = ArgumentCaptor.forClass(byte[].class);
-        verify(sysObject).setObjectName(key);
-        verify(sysObject).setContentType("application/octet-stream");
-        verify(sysObject).setContent(contentCaptor.capture());
-        verify(sysObject).save(); // This will throw IOException
+        documentumService.saveFileToDocumentum(session, inputStream, "file1");
 
-        byte[] savedContent = contentCaptor.getValue();
-        assertEquals(4, savedContent.length);
-        assertEquals(1, savedContent[0]);
-        assertEquals(2, savedContent[1]);
-        assertEquals(3, savedContent[2]);
-        assertEquals(4, savedContent[3]);
-    }
-
-    @Test
-    void testSaveFileToDocumentumWithReadError() throws Exception {
-        String key = "file1";
-        InputStream inputStream = mock(InputStream.class);
-        when(inputStream.read(any(byte[].class), anyInt(), anyInt())).thenThrow(new IOException("Read error"));
-
-        documentumService.saveFileToDocumentum(session, inputStream, key);
-
-        verify(sysObject, never()).save();
+        verify(session, times(1)).newObject("dm_document");
     }
 }
