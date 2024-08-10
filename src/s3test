@@ -131,4 +131,65 @@ class S3ServiceTest {
         verify(s3Client, times(1)).listObjectsV2(any(ListObjectsV2Request.class));
         verify(s3Client, never()).deleteObjects(any(DeleteObjectsRequest.class));
     }
+
+ @Test
+    void testUploadResultToS3_Success() throws Exception {
+        // Arrange
+        Result result = new Result();
+        result.setData("testData");
+        AnotherClass anotherClass = new AnotherClass();
+        anotherClass.setMoreData("moreData");
+        result.setAnotherClass(Arrays.asList(anotherClass));
+
+        String jsonString = "{\"data\":\"testData\",\"anotherClass\":[{\"moreData\":\"moreData\"}]}";
+        when(objectMapper.writeValueAsString(result)).thenReturn(jsonString);
+
+        PutObjectResponse putObjectResponse = PutObjectResponse.builder().build();
+        when(s3Client.putObject(any(PutObjectRequest.class), any())).thenReturn(putObjectResponse);
+
+        // Act
+        s3Service.uploadResultToS3(result, "test-bucket", "test-key.json");
+
+        // Assert
+        verify(s3Client, times(1)).putObject(any(PutObjectRequest.class), any());
+        verify(objectMapper, times(1)).writeValueAsString(result);
+    }
+
+    @Test
+    void testUploadResultToS3_JsonProcessingException() throws Exception {
+        // Arrange
+        Result result = new Result();
+        result.setData("testData");
+        when(objectMapper.writeValueAsString(result)).thenThrow(new com.fasterxml.jackson.core.JsonProcessingException("Error") {});
+
+        // Act & Assert
+        assertThrows(com.fasterxml.jackson.core.JsonProcessingException.class, () -> {
+            s3Service.uploadResultToS3(result, "test-bucket", "test-key.json");
+        });
+
+        verify(s3Client, never()).putObject(any(PutObjectRequest.class), any());
+    }
+
+    @Test
+    void testUploadResultToS3_S3Exception() throws Exception {
+        // Arrange
+        Result result = new Result();
+        result.setData("testData");
+        AnotherClass anotherClass = new AnotherClass();
+        anotherClass.setMoreData("moreData");
+        result.setAnotherClass(Arrays.asList(anotherClass));
+
+        String jsonString = "{\"data\":\"testData\",\"anotherClass\":[{\"moreData\":\"moreData\"}]}";
+        when(objectMapper.writeValueAsString(result)).thenReturn(jsonString);
+
+        doThrow(software.amazon.awssdk.services.s3.model.S3Exception.builder().message("S3 Error").build())
+                .when(s3Client).putObject(any(PutObjectRequest.class), any());
+
+        // Act & Assert
+        assertThrows(software.amazon.awssdk.services.s3.model.S3Exception.class, () -> {
+            s3Service.uploadResultToS3(result, "test-bucket", "test-key.json");
+        });
+
+        verify(s3Client, times(1)).putObject(any(PutObjectRequest.class), any());
+    }
 }
