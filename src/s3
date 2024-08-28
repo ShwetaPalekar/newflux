@@ -1,117 +1,93 @@
-package com.example.demo.service;
+package com.example.lambdas3documentum.service;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.model.S3Object;
+import com.documentum.fc.client.IDfSession;
+import com.documentum.fc.client.IDfSysObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
-import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.*;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
-public class S3Service {
+public class DocumentumService {
 
-    private final S3Client s3Client;
-    private final String bucketName;
+    @Autowired
+    private AmazonS3 amazonS3;
 
-    public S3Service(@Value("${aws.accessKeyId}") String accessKeyId,
-                     @Value("${aws.secretAccessKey}") String secretAccessKey,
-                     @Value("${aws.region}") String region,
-                     @Value("${aws.bucketName}") String bucketName) {
-        this.s3Client = S3Client.builder()
-                .region(Region.of(region))
-                .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKeyId, secretAccessKey)))
-                .build();
-        this.bucketName = bucketName;
-    }
+    @Autowired
+    private IDfSessionManager sessionManager;
 
-    public void moveFile(String sourceKey, String destinationKey) {
-        try {
-            // Copy the file to the new location
-            CopyObjectRequest copyObjectRequest = CopyObjectRequest.builder()
-                    .sourceBucket(bucketName)
-                    .sourceKey(sourceKey)
-                    .destinationBucket(bucketName)
-                    .destinationKey(destinationKey)
-                    .build();
-            s3Client.copyObject(copyObjectRequest);
+    public Result streamFilesToDocumentum(List<String> keys, String bucketName) {
+        Result result = new Result();
+        result.setData("Some data");
 
-            // Delete the original file
-            DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
-                    .bucket(bucketName)
-                    .key(sourceKey)
-                    .build();
-            s3Client.deleteObject(deleteObjectRequest);
-        } catch (S3Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException("Error moving file from " + sourceKey + " to " + destinationKey, e);
-        }
-    }
+        try (IDfSession session = sessionManager.getSession("repo")) {
+            session.beginTransaction(); // Start the transaction
 
-    public void deleteFolder(String folderKey) {
-        try {
-            List<S3Object> objectsToDelete = new ArrayList<>();
-            ListObjectsV2Request listObjectsV2Request = ListObjectsV2Request.builder()
-                    .bucket(bucketName)
-                    .prefix(folderKey)
-                    .build();
-            ListObjectsV2Response listObjectsV2Response;
+            List<AnotherClass> anotherClassList = new ArrayList<>();
+            List<IDfSysObject> documentBatch = new ArrayList<>();
 
-            for (listObjectsV2Response = s3Client.listObjectsV2(listObjectsV2Request);
-                 listObjectsV2Response.isTruncated();
-                 listObjectsV2Response = s3Client.listObjectsV2(listObjectsV2Request.toBuilder()
-                         .continuationToken(listObjectsV2Response.nextContinuationToken())
-                         .build())) {
+            for (String key : keys) {
+                try {
+                    S3Object s3Object = amazonS3.getObject(bucketName, key);
+                    InputStream inputStream = s3Object.getObjectContent();
+                    
+                    // Prepare document but don't save it yet
+                    IDfSysObject newDoc = prepareDocument(session, inputStream, key);
+                    documentBatch.add(newDoc);
 
-                objectsToDelete.addAll(listObjectsV2Response.contents());
+                    AnotherClass anotherClass = new AnotherClass();
+                    anotherClass.setMoreData("Prepared file: " + key);
+                    anotherClassList.add(anotherClass);
+
+                } catch (Exception e) {
+                    System.err.println("Error preparing file: " + key + " - " + e.getMessage());
+                    AnotherClass failedClass = new AnotherClass();
+                    failedClass.setMoreData("Failed to prepare file: " + key + " due to error: " + e.getMessage());
+                    anotherClassList.add(failedClass);
+                }
             }
 
-            // Add remaining objects
-            objectsToDelete.addAll(listObjectsV2Response.contents());
-
-            if (!objectsToDelete.isEmpty()) {
-                List<ObjectIdentifier> objectIdentifiers = objectsToDelete.stream()
-                        .map(S3Object::key)
-                        .map(key -> ObjectIdentifier.builder().key(key).build())
-                        .collect(Collectors.toList());
-
-                DeleteObjectsRequest deleteObjectsRequest = DeleteObjectsRequest.builder()
-                        .bucket(bucketName)
-                        .delete(Delete.builder().objects(objectIdentifiers).build())
-                        .build();
-                s3Client.deleteObjects(deleteObjectsRequest);
+            // Save all documents in a single transaction
+            try {
+                for (IDfSysObject doc : documentBatch) {
+                    doc.save();
+                }
+                session.commitTransaction();
+                System.out.println("Transaction committed successfully.");
+            } catch (Exception e) {
+                session.abortTransaction();
+                System.err.println("Transaction aborted due to error: " + e.getMessage());
+                // Handle rollback or error reporting
             }
 
-        } catch (S3Exception e) {
+            result.setAnotherClass(anotherClassList);
+
+        } catch (Exception e) {
             e.printStackTrace();
-            throw new RuntimeException("Error deleting folder " + folderKey, e);
         }
+
+        return result;
     }
 
-public void uploadResultToS3(Result result, String bucketName, String key) {
-        try {
-            // Convert Result object to JSON string
-            String jsonString = objectMapper.writeValueAsString(result);
-
-            // Convert JSON string to InputStream
-            InputStream inputStream = new ByteArrayInputStream(jsonString.getBytes(StandardCharsets.UTF_8));
-
-            // Create PutObjectRequest
-            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                    .bucket(bucketName)
-                    .key(key)
-                    .build();
-
-            // Upload to S3
-            s3Client.putObject(putObjectRequest, software.amazon.awssdk.core.sync.RequestBody.fromInputStream(inputStream, jsonString.length()));
-        } catch (JsonProcessingException e) {
-            e.printStackTrace(); // Handle JSON processing exceptions
-        } catch (S3Exception e) {
-            e.printStackTrace(); // Handle S3 exceptions
+    private IDfSysObject prepareDocument(IDfSession session, InputStream input, String key) throws Exception {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        int nRead;
+        byte[] data = new byte[65536]; // 64 KB buffer
+        while ((nRead = input.read(data, 0, data.length)) != -1) {
+            buffer.write(data, 0, nRead);
         }
+
+        IDfSysObject newDoc = (IDfSysObject) session.newObject("dm_document");
+        newDoc.setObjectName(key);
+        newDoc.setContentType("application/octet-stream");
+        newDoc.setContent(buffer);
+        // Note: Do not call save() here; just return the prepared document
+
+        return newDoc;
     }
 }
