@@ -1,100 +1,85 @@
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.*;
-import org.mockito.junit.jupiter.MockitoExtension;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.test.StepVerifier;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.util.Arrays;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.api.Test;
 
-@ExtendWith(MockitoExtension.class)
-public class DocumentumServiceTest {
+public class YourClassTest {
 
-    @InjectMocks
-    private DocumentumService documentumService;
+    // Mock the dependencies
+    IDfSysObject document = mock(IDfSysObject.class);
+    IDfAttr type = mock(IDfAttr.class);
+    Logger logger = mock(Logger.class);  // Assuming you have a logger
 
-    @Mock
-    private S3Service s3Service;
+    YourClass yourClassInstance = new YourClass();  // Your class under test
 
-    @Mock
-    private IDfSessionFactory sessionFactory;
+    // Parameterized test using CsvSource for different attribute types
+    @ParameterizedTest
+    @CsvSource({
+        "DM_STRING, testAttr, stringValue, true",
+        "DM_STRING, testAttr, stringValue, false",
+        "DM_INTEGER, testAttr, 123, true",
+        "DM_INTEGER, testAttr, 123, false",
+        "DM_DOUBLE, testAttr, 123.45, true",
+        "DM_DOUBLE, testAttr, 123.45, false",
+        "DM_BOOLEAN, testAttr, true, true",
+        "DM_BOOLEAN, testAttr, true, false"
+    })
+    void testSetAttributes(String attrType, String attrName, String value, boolean isAttributeSingle) throws Exception {
+        // Arrange
+        int dfAttrType;
+        switch (attrType) {
+            case "DM_STRING":
+                dfAttrType = IDfAttr.DM_STRING;
+                break;
+            case "DM_INTEGER":
+                dfAttrType = IDfAttr.DM_INTEGER;
+                break;
+            case "DM_DOUBLE":
+                dfAttrType = IDfAttr.DM_DOUBLE;
+                break;
+            case "DM_BOOLEAN":
+                dfAttrType = IDfAttr.DM_BOOLEAN;
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown type");
+        }
 
-    @Mock
-    private IDfSession session;
+        when(type.getTypeAttrDataType(attrName)).thenReturn(dfAttrType);
 
-    @BeforeEach
-    public void setUp() {
-        when(sessionFactory.getSession(anyString())).thenReturn(session);
-    }
+        // Act
+        yourClassInstance.setAttribute(type, attrName, value, isAttributeSingle, document);
 
-    @Test
-    public void testStreamFilesToDocumentum_Success() {
-        String token = "test-token";
-        List<String> keys = Arrays.asList("file1", "file2");
-        String bucketName = "test-bucket";
-
-        S3Object s3Object = mock(S3Object.class);
-        InputStream inputStream = new ByteArrayInputStream("test-content".getBytes());
-
-        when(s3Service.getObject(bucketName, "file1")).thenReturn(s3Object);
-        when(s3Service.getObject(bucketName, "file2")).thenReturn(s3Object);
-        when(s3Object.getObjectContent()).thenReturn(inputStream);
-
-        Boolean result = documentumService.streamFilesToDocumentum(token, keys, bucketName);
-
-        assertTrue(result);
-        verify(s3Service, times(1)).getObject(bucketName, "file1");
-        verify(s3Service, times(1)).getObject(bucketName, "file2");
-        verify(sessionFactory, times(1)).closeSession(session);
-    }
-
-    @Test
-    public void testStreamFilesToDocumentum_Exception() {
-        String token = "test-token";
-        List<String> keys = Arrays.asList("file1");
-        String bucketName = "test-bucket";
-
-        when(s3Service.getObject(bucketName, "file1")).thenThrow(new RuntimeException("S3 error"));
-
-        Boolean result = documentumService.streamFilesToDocumentum(token, keys, bucketName);
-
-        assertFalse(result);
-        verify(s3Service, times(1)).getObject(bucketName, "file1");
-        verify(sessionFactory, times(1)).closeSession(session);
-    }
-
-    @Test
-    public void testSaveFileToDocumentum_Success() throws Exception {
-        InputStream inputStream = new ByteArrayInputStream("test-content".getBytes());
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-
-        IDfDocument newDoc = mock(IDfDocument.class);
-        when(session.newObject("dm_document")).thenReturn(newDoc);
-
-        documentumService.saveFileToDocumentum(session, inputStream, "file1");
-
-        verify(newDoc, times(1)).setObjectName("file1");
-        verify(newDoc, times(1)).setContent(buffer);
-        verify(newDoc, times(1)).save();
-    }
-
-    @Test
-    public void testSaveFileToDocumentum_Exception() throws Exception {
-        InputStream inputStream = new ByteArrayInputStream("test-content".getBytes());
-
-        doThrow(new RuntimeException("Save error")).when(session).newObject("dm_document");
-
-        documentumService.saveFileToDocumentum(session, inputStream, "file1");
-
-        verify(session, times(1)).newObject("dm_document");
+        // Assert
+        switch (dfAttrType) {
+            case IDfAttr.DM_STRING:
+                if (isAttributeSingle) {
+                    verify(document).setString(attrName, value);
+                } else {
+                    verify(document).appendString(attrName, value);
+                }
+                break;
+            case IDfAttr.DM_INTEGER:
+                if (isAttributeSingle) {
+                    verify(document).setInt(attrName, Integer.parseInt(value));
+                } else {
+                    verify(document).appendInt(attrName, Integer.parseInt(value));
+                }
+                break;
+            case IDfAttr.DM_DOUBLE:
+                if (isAttributeSingle) {
+                    verify(document).setDouble(attrName, Double.parseDouble(value));
+                } else {
+                    verify(document).appendDouble(attrName, Double.parseDouble(value));
+                }
+                break;
+            case IDfAttr.DM_BOOLEAN:
+                if (isAttributeSingle) {
+                    verify(document).setBoolean(attrName, Boolean.parseBoolean(value));
+                } else {
+                    verify(document).appendBoolean(attrName, Boolean.parseBoolean(value));
+                }
+                break;
+        }
     }
 }
