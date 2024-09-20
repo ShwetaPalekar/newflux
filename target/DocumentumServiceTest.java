@@ -1,85 +1,113 @@
-import static org.mockito.Mockito.*;
-import static org.junit.jupiter.api.Assertions.*;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import com.documentum.fc.client.IDfFolder;
+import com.documentum.fc.client.IDfSession;
+import com.documentum.fc.common.DfException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
-public class YourClassTest {
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-    // Mock the dependencies
-    IDfSysObject document = mock(IDfSysObject.class);
-    IDfAttr type = mock(IDfAttr.class);
-    Logger logger = mock(Logger.class);  // Assuming you have a logger
+public class DocumentumServiceTest {
 
-    YourClass yourClassInstance = new YourClass();  // Your class under test
+    private IDfSession session;
+    private IDfFolder folder;
+    private DocumentumService documentumService;
 
-    // Parameterized test using CsvSource for different attribute types
-    @ParameterizedTest
-    @CsvSource({
-        "DM_STRING, testAttr, stringValue, true",
-        "DM_STRING, testAttr, stringValue, false",
-        "DM_INTEGER, testAttr, 123, true",
-        "DM_INTEGER, testAttr, 123, false",
-        "DM_DOUBLE, testAttr, 123.45, true",
-        "DM_DOUBLE, testAttr, 123.45, false",
-        "DM_BOOLEAN, testAttr, true, true",
-        "DM_BOOLEAN, testAttr, true, false"
-    })
-    void testSetAttributes(String attrType, String attrName, String value, boolean isAttributeSingle) throws Exception {
-        // Arrange
-        int dfAttrType;
-        switch (attrType) {
-            case "DM_STRING":
-                dfAttrType = IDfAttr.DM_STRING;
-                break;
-            case "DM_INTEGER":
-                dfAttrType = IDfAttr.DM_INTEGER;
-                break;
-            case "DM_DOUBLE":
-                dfAttrType = IDfAttr.DM_DOUBLE;
-                break;
-            case "DM_BOOLEAN":
-                dfAttrType = IDfAttr.DM_BOOLEAN;
-                break;
-            default:
-                throw new IllegalArgumentException("Unknown type");
-        }
+    @BeforeEach
+    public void setUp() {
+        session = mock(IDfSession.class);
+        folder = mock(IDfFolder.class);
+        documentumService = new DocumentumService();
+    }
 
-        when(type.getTypeAttrDataType(attrName)).thenReturn(dfAttrType);
+    @Test
+    public void testEnsureFolderExists_FolderAlreadyExists() throws Exception {
+        // Given
+        String folderPath = "/existingFolder";
+        when(session.getObjectByQualification("dm_folder where any r_folder_path = '" + folderPath + "'"))
+            .thenReturn(folder);
 
-        // Act
-        yourClassInstance.setAttribute(type, attrName, value, isAttributeSingle, document);
+        // When
+        IDfFolder result = documentumService.ensureFolderExists(session, folderPath);
 
-        // Assert
-        switch (dfAttrType) {
-            case IDfAttr.DM_STRING:
-                if (isAttributeSingle) {
-                    verify(document).setString(attrName, value);
-                } else {
-                    verify(document).appendString(attrName, value);
-                }
-                break;
-            case IDfAttr.DM_INTEGER:
-                if (isAttributeSingle) {
-                    verify(document).setInt(attrName, Integer.parseInt(value));
-                } else {
-                    verify(document).appendInt(attrName, Integer.parseInt(value));
-                }
-                break;
-            case IDfAttr.DM_DOUBLE:
-                if (isAttributeSingle) {
-                    verify(document).setDouble(attrName, Double.parseDouble(value));
-                } else {
-                    verify(document).appendDouble(attrName, Double.parseDouble(value));
-                }
-                break;
-            case IDfAttr.DM_BOOLEAN:
-                if (isAttributeSingle) {
-                    verify(document).setBoolean(attrName, Boolean.parseBoolean(value));
-                } else {
-                    verify(document).appendBoolean(attrName, Boolean.parseBoolean(value));
-                }
-                break;
-        }
+        // Then
+        verify(session, never()).newObject("dm_folder"); // Folder creation should not happen
+        verify(folder, never()).save();
+        assertNotNull(result);
+        System.out.println("Folder exists: " + folderPath);
+    }
+
+    @Test
+    public void testEnsureFolderExists_FolderDoesNotExist() throws Exception {
+        // Given
+        String folderPath = "/newFolder/subFolder";
+        when(session.getObjectByQualification("dm_folder where any r_folder_path = '" + folderPath + "'"))
+            .thenReturn(null); // Folder does not exist
+        when(session.newObject("dm_folder")).thenReturn(folder);
+
+        // When
+        IDfFolder result = documentumService.ensureFolderExists(session, folderPath);
+
+        // Then
+        verify(session).newObject("dm_folder"); // Ensure new folder is created
+        verify(folder).setObjectName("subFolder"); // Ensure folder name is set
+        verify(folder).link("/newFolder"); // Ensure the folder is linked to the parent
+        verify(folder).save(); // Ensure the folder is saved
+
+        assertNotNull(result);
+        System.out.println("Created new folder: " + folderPath);
+    }
+
+    @Test
+    public void testEnsureFolderExists_ThrowsException() throws Exception {
+        // Given
+        String folderPath = "/errorFolder";
+        when(session.getObjectByQualification("dm_folder where any r_folder_path = '" + folderPath + "'"))
+            .thenThrow(new DfException("Error fetching folder"));
+
+        // When & Then
+        Exception exception = assertThrows(DfException.class, () -> {
+            documentumService.ensureFolderExists(session, folderPath);
+        });
+
+        assertEquals("Error fetching folder", exception.getMessage());
+    }
+
+    @Test
+    public void testEnsureFolderExists_FolderCreationThrowsException() throws Exception {
+        // Given
+        String folderPath = "/newFolder/subFolder";
+        when(session.getObjectByQualification("dm_folder where any r_folder_path = '" + folderPath + "'"))
+            .thenReturn(null); // Folder does not exist
+        when(session.newObject("dm_folder")).thenThrow(new DfException("Error creating folder"));
+
+        // When & Then
+        Exception exception = assertThrows(DfException.class, () -> {
+            documentumService.ensureFolderExists(session, folderPath);
+        });
+
+        assertEquals("Error creating folder", exception.getMessage());
     }
 }
+
+
+            // Ensure the folder exists or create it if necessary
+            IDfFolder folder = ensureFolderExists(session, folderPath);
+
+    private IDfFolder ensureFolderExists(IDfSession session, String folderPath) throws Exception {
+        String dqlQuery = "dm_folder where any r_folder_path = '" + folderPath + "'";
+        IDfFolder folder = (IDfFolder) session.getObjectByQualification(dqlQuery);
+
+        if (folder == null) {
+            folder = (IDfFolder) session.newObject("dm_folder");
+            folder.setObjectName(folderPath.substring(folderPath.lastIndexOf("/") + 1));
+            folder.link(folderPath.substring(0, folderPath.lastIndexOf("/")));
+            folder.save();
+            System.out.println("Created new folder: " + folderPath);
+        } else {
+            System.out.println("Folder exists: " + folderPath);
+        }
+
+        return folder;
+    }
