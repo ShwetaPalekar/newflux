@@ -1,113 +1,155 @@
-import com.documentum.fc.client.IDfFolder;
-import com.documentum.fc.client.IDfSession;
-import com.documentum.fc.common.DfException;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import static org.junit.Assert.*;
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import com.documentum.fc.common.DfException;
 
-public class DocumentumServiceTest {
+public class CIDProcessorUtilTest {
 
-    private IDfSession session;
-    private IDfFolder folder;
-    private DocumentumService documentumService;
+    @Mock
+    private IDfSysObject mockDocument;
 
-    @BeforeEach
+    @InjectMocks
+    private CIDProcessorUtil cidProcessorUtil;
+
+    @Before
     public void setUp() {
-        session = mock(IDfSession.class);
-        folder = mock(IDfFolder.class);
-        documentumService = new DocumentumService();
+        MockitoAnnotations.initMocks(this);
     }
 
+    // Test for setDocumentIdHex with "cba_ppow" type
     @Test
-    public void testEnsureFolderExists_FolderAlreadyExists() throws Exception {
-        // Given
-        String folderPath = "/existingFolder";
-        when(session.getObjectByQualification("dm_folder where any r_folder_path = '" + folderPath + "'"))
-            .thenReturn(folder);
+    public void testSetDocumentIdHex_cbaPpowType() throws DfException {
+        when(mockDocument.getTypeName()).thenReturn("cba_ppow");
+        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000001"));
 
-        // When
-        IDfFolder result = documentumService.ensureFolderExists(session, folderPath);
+        IDfSysObject result = cidProcessorUtil.setDocumentIdHex(mockDocument);
 
-        // Then
-        verify(session, never()).newObject("dm_folder"); // Folder creation should not happen
-        verify(folder, never()).save();
-        assertNotNull(result);
-        System.out.println("Folder exists: " + folderPath);
+        verify(mockDocument).setString("c_documentid", "1450001");
+        assertEquals(mockDocument, result);
     }
 
+    // Test for setDocumentIdHex with "cba_paf" and "VENDOR" bizchannel
     @Test
-    public void testEnsureFolderExists_FolderDoesNotExist() throws Exception {
-        // Given
-        String folderPath = "/newFolder/subFolder";
-        when(session.getObjectByQualification("dm_folder where any r_folder_path = '" + folderPath + "'"))
-            .thenReturn(null); // Folder does not exist
-        when(session.newObject("dm_folder")).thenReturn(folder);
+    public void testSetDocumentIdHex_cbaPafType_VendorBizChannel() throws DfException {
+        when(mockDocument.getTypeName()).thenReturn("cba_paf");
+        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000002"));
+        when(mockDocument.getString("c_paf_bizchannel")).thenReturn("VENDOR");
 
-        // When
-        IDfFolder result = documentumService.ensureFolderExists(session, folderPath);
+        IDfSysObject result = cidProcessorUtil.setDocumentIdHex(mockDocument);
 
-        // Then
-        verify(session).newObject("dm_folder"); // Ensure new folder is created
-        verify(folder).setObjectName("subFolder"); // Ensure folder name is set
-        verify(folder).link("/newFolder"); // Ensure the folder is linked to the parent
-        verify(folder).save(); // Ensure the folder is saved
-
-        assertNotNull(result);
-        System.out.println("Created new folder: " + folderPath);
+        verify(mockDocument).setString("c_documentid", "1450003");
+        assertEquals(mockDocument, result);
     }
 
+    // Test for setDocumentIdHex with "cba_paf" and non-"VENDOR" bizchannel
     @Test
-    public void testEnsureFolderExists_ThrowsException() throws Exception {
-        // Given
-        String folderPath = "/errorFolder";
-        when(session.getObjectByQualification("dm_folder where any r_folder_path = '" + folderPath + "'"))
-            .thenThrow(new DfException("Error fetching folder"));
+    public void testSetDocumentIdHex_cbaPafType_NonVendorBizChannel() throws DfException {
+        when(mockDocument.getTypeName()).thenReturn("cba_paf");
+        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000003"));
+        when(mockDocument.getString("c_paf_bizchannel")).thenReturn("NON_VENDOR");
 
-        // When & Then
-        Exception exception = assertThrows(DfException.class, () -> {
-            documentumService.ensureFolderExists(session, folderPath);
-        });
+        IDfSysObject result = cidProcessorUtil.setDocumentIdHex(mockDocument);
 
-        assertEquals("Error fetching folder", exception.getMessage());
+        verify(mockDocument).setString("c_documentid", "1450002");
+        assertEquals(mockDocument, result);
     }
 
+    // Test for setDocumentIdHex when bizchannel is null
     @Test
-    public void testEnsureFolderExists_FolderCreationThrowsException() throws Exception {
-        // Given
-        String folderPath = "/newFolder/subFolder";
-        when(session.getObjectByQualification("dm_folder where any r_folder_path = '" + folderPath + "'"))
-            .thenReturn(null); // Folder does not exist
-        when(session.newObject("dm_folder")).thenThrow(new DfException("Error creating folder"));
+    public void testSetDocumentIdHex_NullBizChannel() throws DfException {
+        when(mockDocument.getTypeName()).thenReturn("cba_paf");
+        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000004"));
+        when(mockDocument.getString("c_paf_bizchannel")).thenReturn(null);
 
-        // When & Then
-        Exception exception = assertThrows(DfException.class, () -> {
-            documentumService.ensureFolderExists(session, folderPath);
-        });
+        IDfSysObject result = cidProcessorUtil.setDocumentIdHex(mockDocument);
 
-        assertEquals("Error creating folder", exception.getMessage());
+        verify(mockDocument).setString("c_documentid", "1450002");
+        assertEquals(mockDocument, result);
+    }
+
+    // Test for setDocumentIdHex when object type is not recognized (default case)
+    @Test
+    public void testSetDocumentIdHex_DefaultType() throws DfException {
+        when(mockDocument.getTypeName()).thenReturn("unknown_type");
+        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000005"));
+
+        IDfSysObject result = cidProcessorUtil.setDocumentIdHex(mockDocument);
+
+        verify(mockDocument).setString("c_documentid", "1450005");
+        assertEquals(mockDocument, result);
+    }
+
+    // Test for setDocumentIdInt with setObjectName = true
+    @Test
+    public void testSetDocumentIdInt_SetObjectNameTrue() throws DfException {
+        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000006"));
+
+        IDfSysObject result = cidProcessorUtil.setDocumentIdInt(mockDocument, true);
+
+        verify(mockDocument).setString("object_name", "24" + "1450006.pdf");
+        verify(mockDocument).setString("c_documentid", "1450006");
+        assertEquals(mockDocument, result);
+    }
+
+    // Test for setDocumentIdInt with setObjectName = false
+    @Test
+    public void testSetDocumentIdInt_SetObjectNameFalse() throws DfException {
+        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000007"));
+
+        IDfSysObject result = cidProcessorUtil.setDocumentIdInt(mockDocument, false);
+
+        verify(mockDocument).setString("c_documentid", "1450007");
+        assertEquals(mockDocument, result);
+    }
+
+    // Test for setDocumentIdInt when object ID is at its minimum value
+    @Test
+    public void testSetDocumentIdInt_MinObjectId() throws DfException {
+        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000000"));
+
+        IDfSysObject result = cidProcessorUtil.setDocumentIdInt(mockDocument, false);
+
+        verify(mockDocument).setString("c_documentid", "1450000");
+        assertEquals(mockDocument, result);
+    }
+
+    // Test for setDocumentIdInt when object ID is at its maximum value
+    @Test
+    public void testSetDocumentIdInt_MaxObjectId() throws DfException {
+        when(mockDocument.getObjectId()).thenReturn(mockObjectId("090000000FFFFFFFFF"));
+
+        IDfSysObject result = cidProcessorUtil.setDocumentIdInt(mockDocument, false);
+
+        verify(mockDocument).setString("c_documentid", "145FFFFFFFF");
+        assertEquals(mockDocument, result);
+    }
+
+    // Test for setDocumentIdInt when getObjectId throws an exception
+    @Test(expected = DfException.class)
+    public void testSetDocumentIdInt_GetObjectIdException() throws DfException {
+        when(mockDocument.getObjectId()).thenThrow(new DfException("Object ID retrieval error"));
+
+        cidProcessorUtil.setDocumentIdInt(mockDocument, false);
+    }
+
+    // Test for setDocumentIdHex when getString throws an exception
+    @Test(expected = DfException.class)
+    public void testSetDocumentIdHex_GetStringException() throws DfException {
+        when(mockDocument.getTypeName()).thenReturn("cba_paf");
+        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000008"));
+        when(mockDocument.getString("c_paf_bizchannel")).thenThrow(new DfException("Attribute retrieval error"));
+
+        cidProcessorUtil.setDocumentIdHex(mockDocument);
+    }
+
+    // Helper method to mock ObjectId for IDfSysObject
+    private IDfId mockObjectId(String idValue) {
+        IDfId mockObjectId = mock(IDfId.class);
+        when(mockObjectId.getId()).thenReturn(idValue);
+        return mockObjectId;
     }
 }
-
-
-            // Ensure the folder exists or create it if necessary
-            IDfFolder folder = ensureFolderExists(session, folderPath);
-
-    private IDfFolder ensureFolderExists(IDfSession session, String folderPath) throws Exception {
-        String dqlQuery = "dm_folder where any r_folder_path = '" + folderPath + "'";
-        IDfFolder folder = (IDfFolder) session.getObjectByQualification(dqlQuery);
-
-        if (folder == null) {
-            folder = (IDfFolder) session.newObject("dm_folder");
-            folder.setObjectName(folderPath.substring(folderPath.lastIndexOf("/") + 1));
-            folder.link(folderPath.substring(0, folderPath.lastIndexOf("/")));
-            folder.save();
-            System.out.println("Created new folder: " + folderPath);
-        } else {
-            System.out.println("Folder exists: " + folderPath);
-        }
-
-        return folder;
-    }
