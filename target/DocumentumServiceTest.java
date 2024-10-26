@@ -1,155 +1,99 @@
-import static org.mockito.Mockito.*;
-import static org.junit.Assert.*;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import com.documentum.fc.common.DfException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class CIDProcessorUtilTest {
+public Result streamFilesToDocumentum(List<String> keys, String bucketName) {
+    Result result = new Result();
+    result.setData("Some data");
 
-    @Mock
-    private IDfSysObject mockDocument;
+    ExecutorService executor = Executors.newFixedThreadPool(5); // Define pool size based on your needs
+    List<AnotherClass> anotherClassList = new ArrayList<>();
+    ConcurrentLinkedQueue<IDfSysObject> successfullyCommittedDocs = new ConcurrentLinkedQueue<>();
+    List<Future<Boolean>> futures = new ArrayList<>();
+    boolean allSuccessful = true;
 
-    @InjectMocks
-    private CIDProcessorUtil cidProcessorUtil;
+    // Process each key in a separate thread
+    for (String key : keys) {
+        futures.add(executor.submit(() -> {
+            try (IDfSession session = sessionManager.getSession("repo")) {
+                session.beginTransaction();
 
-    @Before
-    public void setUp() {
-        MockitoAnnotations.initMocks(this);
+                S3Object s3Object = amazonS3.getObject(bucketName, key);
+                InputStream inputStream = s3Object.getObjectContent();
+
+                IDfSysObject newDoc = prepareAndCommitDocument(session, inputStream, key);
+                
+                session.commitTransaction();
+                successfullyCommittedDocs.add(newDoc);
+
+                AnotherClass anotherClass = new AnotherClass();
+                anotherClass.setMoreData("Successfully processed and committed file: " + key);
+                synchronized (anotherClassList) {
+                    anotherClassList.add(anotherClass);
+                }
+                return true; // Success
+            } catch (Exception e) {
+                System.err.println("Error processing file: " + key + " - " + e.getMessage());
+                AnotherClass failedClass = new AnotherClass();
+                failedClass.setMoreData("Failed to process file: " + key + " due to error: " + e.getMessage());
+                synchronized (anotherClassList) {
+                    anotherClassList.add(failedClass);
+                }
+                return false; // Failure
+            }
+        }));
     }
 
-    // Test for setDocumentIdHex with "cba_ppow" type
-    @Test
-    public void testSetDocumentIdHex_cbaPpowType() throws DfException {
-        when(mockDocument.getTypeName()).thenReturn("cba_ppow");
-        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000001"));
-
-        IDfSysObject result = cidProcessorUtil.setDocumentIdHex(mockDocument);
-
-        verify(mockDocument).setString("c_documentid", "1450001");
-        assertEquals(mockDocument, result);
+    // Check if all threads were successful
+    for (Future<Boolean> future : futures) {
+        try {
+            if (!future.get()) {
+                allSuccessful = false;
+                break;
+            }
+        } catch (Exception e) {
+            allSuccessful = false;
+            e.printStackTrace();
+        }
     }
 
-    // Test for setDocumentIdHex with "cba_paf" and "VENDOR" bizchannel
-    @Test
-    public void testSetDocumentIdHex_cbaPafType_VendorBizChannel() throws DfException {
-        when(mockDocument.getTypeName()).thenReturn("cba_paf");
-        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000002"));
-        when(mockDocument.getString("c_paf_bizchannel")).thenReturn("VENDOR");
-
-        IDfSysObject result = cidProcessorUtil.setDocumentIdHex(mockDocument);
-
-        verify(mockDocument).setString("c_documentid", "1450003");
-        assertEquals(mockDocument, result);
+    // Rollback if any failure occurred
+    if (!allSuccessful) {
+        try (IDfSession session = sessionManager.getSession("repo")) {
+            for (IDfSysObject doc : successfullyCommittedDocs) {
+                try {
+                    doc.destroy();
+                } catch (Exception e) {
+                    System.err.println("Error rolling back document: " + doc.getObjectName() + " - " + e.getMessage());
+                }
+            }
+            System.err.println("Rollback completed due to errors during processing.");
+        }
     }
 
-    // Test for setDocumentIdHex with "cba_paf" and non-"VENDOR" bizchannel
-    @Test
-    public void testSetDocumentIdHex_cbaPafType_NonVendorBizChannel() throws DfException {
-        when(mockDocument.getTypeName()).thenReturn("cba_paf");
-        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000003"));
-        when(mockDocument.getString("c_paf_bizchannel")).thenReturn("NON_VENDOR");
+    executor.shutdown(); // Ensure the executor shuts down
 
-        IDfSysObject result = cidProcessorUtil.setDocumentIdHex(mockDocument);
+    result.setAnotherClass(anotherClassList);
+    return result;
+}
 
-        verify(mockDocument).setString("c_documentid", "1450002");
-        assertEquals(mockDocument, result);
+private IDfSysObject prepareAndCommitDocument(IDfSession session, InputStream input, String key) throws Exception {
+    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+    int nRead;
+    byte[] data = new byte[65536]; // 64 KB buffer
+    while ((nRead = input.read(data, 0, data.length)) != -1) {
+        buffer.write(data, 0, nRead);
     }
 
-    // Test for setDocumentIdHex when bizchannel is null
-    @Test
-    public void testSetDocumentIdHex_NullBizChannel() throws DfException {
-        when(mockDocument.getTypeName()).thenReturn("cba_paf");
-        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000004"));
-        when(mockDocument.getString("c_paf_bizchannel")).thenReturn(null);
+    IDfSysObject newDoc = (IDfSysObject) session.newObject("dm_document");
+    newDoc.setObjectName(key);
+    newDoc.setContentType("application/octet-stream");
+    newDoc.setContent(buffer);
 
-        IDfSysObject result = cidProcessorUtil.setDocumentIdHex(mockDocument);
+    // Save and commit immediately
+    newDoc.save();
 
-        verify(mockDocument).setString("c_documentid", "1450002");
-        assertEquals(mockDocument, result);
-    }
-
-    // Test for setDocumentIdHex when object type is not recognized (default case)
-    @Test
-    public void testSetDocumentIdHex_DefaultType() throws DfException {
-        when(mockDocument.getTypeName()).thenReturn("unknown_type");
-        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000005"));
-
-        IDfSysObject result = cidProcessorUtil.setDocumentIdHex(mockDocument);
-
-        verify(mockDocument).setString("c_documentid", "1450005");
-        assertEquals(mockDocument, result);
-    }
-
-    // Test for setDocumentIdInt with setObjectName = true
-    @Test
-    public void testSetDocumentIdInt_SetObjectNameTrue() throws DfException {
-        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000006"));
-
-        IDfSysObject result = cidProcessorUtil.setDocumentIdInt(mockDocument, true);
-
-        verify(mockDocument).setString("object_name", "24" + "1450006.pdf");
-        verify(mockDocument).setString("c_documentid", "1450006");
-        assertEquals(mockDocument, result);
-    }
-
-    // Test for setDocumentIdInt with setObjectName = false
-    @Test
-    public void testSetDocumentIdInt_SetObjectNameFalse() throws DfException {
-        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000007"));
-
-        IDfSysObject result = cidProcessorUtil.setDocumentIdInt(mockDocument, false);
-
-        verify(mockDocument).setString("c_documentid", "1450007");
-        assertEquals(mockDocument, result);
-    }
-
-    // Test for setDocumentIdInt when object ID is at its minimum value
-    @Test
-    public void testSetDocumentIdInt_MinObjectId() throws DfException {
-        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000000"));
-
-        IDfSysObject result = cidProcessorUtil.setDocumentIdInt(mockDocument, false);
-
-        verify(mockDocument).setString("c_documentid", "1450000");
-        assertEquals(mockDocument, result);
-    }
-
-    // Test for setDocumentIdInt when object ID is at its maximum value
-    @Test
-    public void testSetDocumentIdInt_MaxObjectId() throws DfException {
-        when(mockDocument.getObjectId()).thenReturn(mockObjectId("090000000FFFFFFFFF"));
-
-        IDfSysObject result = cidProcessorUtil.setDocumentIdInt(mockDocument, false);
-
-        verify(mockDocument).setString("c_documentid", "145FFFFFFFF");
-        assertEquals(mockDocument, result);
-    }
-
-    // Test for setDocumentIdInt when getObjectId throws an exception
-    @Test(expected = DfException.class)
-    public void testSetDocumentIdInt_GetObjectIdException() throws DfException {
-        when(mockDocument.getObjectId()).thenThrow(new DfException("Object ID retrieval error"));
-
-        cidProcessorUtil.setDocumentIdInt(mockDocument, false);
-    }
-
-    // Test for setDocumentIdHex when getString throws an exception
-    @Test(expected = DfException.class)
-    public void testSetDocumentIdHex_GetStringException() throws DfException {
-        when(mockDocument.getTypeName()).thenReturn("cba_paf");
-        when(mockDocument.getObjectId()).thenReturn(mockObjectId("0900000000000008"));
-        when(mockDocument.getString("c_paf_bizchannel")).thenThrow(new DfException("Attribute retrieval error"));
-
-        cidProcessorUtil.setDocumentIdHex(mockDocument);
-    }
-
-    // Helper method to mock ObjectId for IDfSysObject
-    private IDfId mockObjectId(String idValue) {
-        IDfId mockObjectId = mock(IDfId.class);
-        when(mockObjectId.getId()).thenReturn(idValue);
-        return mockObjectId;
-    }
+    return newDoc;
 }
