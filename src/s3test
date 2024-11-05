@@ -1,135 +1,55 @@
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.S3Object;
-import com.documentum.fc.client.IDfSession;
-import com.documentum.fc.client.IDfSessionManager;
-import com.documentum.fc.client.IDfSysObject;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+#!/bin/bash
 
-import java.io.InputStream;
-import java.util.Arrays;
-import java.util.List;
+# Check if environment and account ID are provided
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Usage: $0 <environment> <account-id>"
+    exit 1
+fi
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+# Assign variables
+ENVIRONMENT="$1"
+ACCOUNT_ID="$2"
+BUCKET_NAME="aws-bucket-${ENVIRONMENT}-${ACCOUNT_ID}"
 
-public class DocumentumServiceTest {
+# Validate environment input
+if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "uat" && "$ENVIRONMENT" != "prod" ]]; then
+    echo "Invalid environment specified. Use one of 'dev', 'uat', or 'prod'."
+    exit 1
+fi
 
-    @Mock
-    private AmazonS3 amazonS3;
+# Check if bucket already exists
+if aws s3 ls "s3://${BUCKET_NAME}" 2>/dev/null; then
+    echo "Bucket ${BUCKET_NAME} already exists. Exiting with success."
+    exit 0
+else
+    # Create bucket if it doesn't exist
+    echo "Bucket ${BUCKET_NAME} does not exist. Creating bucket..."
+    aws s3 mb "s3://${BUCKET_NAME}"
+    
+    # Check if bucket creation was successful
+    if [ $? -eq 0 ]; then
+        echo "Bucket ${BUCKET_NAME} created successfully."
+    else
+        echo "Failed to create bucket ${BUCKET_NAME}. Exiting with error."
+        exit 1
+    fi
+fi
 
-    @Mock
-    private IDfSessionManager sessionManager;
+jobs:
+  create-s3-bucket:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assume AWS Role
+        id: assume-role
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/YourRoleName
+          aws-region: us-west-2  # Specify your region
 
-    @Mock
-    private IDfSession session;
-
-    @Mock
-    private S3Object s3Object;
-
-    @Mock
-    private InputStream inputStream;
-
-    @Mock
-    private IDfSysObject dfSysObject;
-
-    @InjectMocks
-    private DocumentumService documentumService;
-
-    @BeforeEach
-    public void setUp() {
-        MockitoAnnotations.openMocks(this);
-    }
-
-    // Test for streamFilesToDocumentum: Success scenario
-    @Test
-    public void testStreamFilesToDocumentum_Success() throws Exception {
-        List<String> keys = Arrays.asList("file1.pdf", "file2.pdf", "file3.pdf");
-
-        when(sessionManager.getSession(anyString())).thenReturn(session);
-        when(amazonS3.getObject(anyString(), anyString())).thenReturn(s3Object);
-        when(s3Object.getObjectContent()).thenReturn(inputStream);
-        when(session.newObject(anyString())).thenReturn(dfSysObject);
-
-        Result result = documentumService.streamFilesToDocumentum(keys, "bucketName");
-
-        verify(session, times(1)).beginTransaction();
-        verify(dfSysObject, times(3)).save();
-        verify(session, times(1)).commitTransaction();
-        assertEquals("Some data", result.getData());
-    }
-
-    // Test for streamFilesToDocumentum: Partial failure scenario
-    @Test
-    public void testStreamFilesToDocumentum_PartialFailure() throws Exception {
-        List<String> keys = Arrays.asList("file1.pdf", "file2.pdf", "file3.pdf");
-
-        when(sessionManager.getSession(anyString())).thenReturn(session);
-        when(amazonS3.getObject(anyString(), eq("file2.pdf"))).thenThrow(new RuntimeException("File not found"));
-        when(amazonS3.getObject(anyString(), anyString())).thenReturn(s3Object);
-        when(s3Object.getObjectContent()).thenReturn(inputStream);
-        when(session.newObject(anyString())).thenReturn(dfSysObject);
-
-        Result result = documentumService.streamFilesToDocumentum(keys, "bucketName");
-
-        verify(session, never()).commitTransaction();
-        verify(session, never()).abortTransaction();
-        assertEquals(1, result.getAnotherClass().size()); // One failure should be recorded
-    }
-
-    // Test for streamFilesToDocumentum: Transaction failure scenario
-    @Test
-    public void testStreamFilesToDocumentum_TransactionFailure() throws Exception {
-        List<String> keys = Arrays.asList("file1.pdf", "file2.pdf", "file3.pdf");
-
-        when(sessionManager.getSession(anyString())).thenReturn(session);
-        when(amazonS3.getObject(anyString(), anyString())).thenReturn(s3Object);
-        when(s3Object.getObjectContent()).thenReturn(inputStream);
-        when(session.newObject(anyString())).thenReturn(dfSysObject);
-        doThrow(new RuntimeException("Save failed")).when(dfSysObject).save();
-
-        Result result = documentumService.streamFilesToDocumentum(keys, "bucketName");
-
-        verify(session, times(1)).beginTransaction();
-        verify(session, times(1)).abortTransaction();
-        verify(session, never()).commitTransaction();
-        assertEquals(0, result.getAnotherClass().size()); // No successful operations
-    }
-
-    // Test for prepareDocument: Success scenario
-    @Test
-    public void testPrepareDocument_Success() throws Exception {
-        when(sessionManager.getSession(anyString())).thenReturn(session);
-        when(session.newObject(anyString())).thenReturn(dfSysObject);
-
-        InputStream inputStream = mock(InputStream.class);
-
-        IDfSysObject result = documentumService.prepareDocument(inputStream, "file1.pdf");
-
-        verify(dfSysObject, times(1)).setObjectName("file1.pdf");
-        verify(dfSysObject, times(1)).setContentType("application/pdf");
-        verify(dfSysObject, times(1)).setContentEx(inputStream, "pdf");
-        assertNotNull(result);
-    }
-
-    // Test for prepareDocument: Failure scenario
-    @Test
-    public void testPrepareDocument_Failure() throws Exception {
-        when(sessionManager.getSession(anyString())).thenReturn(session);
-        when(session.newObject(anyString())).thenReturn(dfSysObject);
-        doThrow(new RuntimeException("Document creation failed")).when(dfSysObject).setContentEx(any(), anyString());
-
-        InputStream inputStream = mock(InputStream.class);
-
-        Exception exception = assertThrows(Exception.class, () -> {
-            documentumService.prepareDocument(inputStream, "file1.pdf");
-        });
-
-        assertEquals("Document creation failed", exception.getMessage());
-    }
-}
+      - name: Run bucket creation script
+        run: |
+          chmod +x ./create_bucket.sh
+          ./create_bucket.sh ${{ env.ENVIRONMENT }} ${{ env.ACCOUNT_ID }}
+        env:
+          ENVIRONMENT: dev  # Set environment as needed
+          ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}  # Pass AWS account ID
