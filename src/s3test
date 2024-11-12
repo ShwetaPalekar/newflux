@@ -1,55 +1,17 @@
-#!/bin/bash
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-# Check if environment and account ID are provided
-if [ -z "$1" ] || [ -z "$2" ]; then
-    echo "Usage: $0 <environment> <account-id>"
-    exit 1
-fi
+public class LogUtils {
+    private static final Logger logger = LoggerFactory.getLogger(LogUtils.class);
+    private static final ObjectMapper mapper = new ObjectMapper();
 
-# Assign variables
-ENVIRONMENT="$1"
-ACCOUNT_ID="$2"
-BUCKET_NAME="aws-bucket-${ENVIRONMENT}-${ACCOUNT_ID}"
-
-# Validate environment input
-if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "uat" && "$ENVIRONMENT" != "prod" ]]; then
-    echo "Invalid environment specified. Use one of 'dev', 'uat', or 'prod'."
-    exit 1
-fi
-
-# Check if bucket already exists
-if aws s3 ls "s3://${BUCKET_NAME}" 2>/dev/null; then
-    echo "Bucket ${BUCKET_NAME} already exists. Exiting with success."
-    exit 0
-else
-    # Create bucket if it doesn't exist
-    echo "Bucket ${BUCKET_NAME} does not exist. Creating bucket..."
-    aws s3 mb "s3://${BUCKET_NAME}"
-    
-    # Check if bucket creation was successful
-    if [ $? -eq 0 ]; then
-        echo "Bucket ${BUCKET_NAME} created successfully."
-    else
-        echo "Failed to create bucket ${BUCKET_NAME}. Exiting with error."
-        exit 1
-    fi
-fi
-
-jobs:
-  create-s3-bucket:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Assume AWS Role
-        id: assume-role
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/YourRoleName
-          aws-region: us-west-2  # Specify your region
-
-      - name: Run bucket creation script
-        run: |
-          chmod +x ./create_bucket.sh
-          ./create_bucket.sh ${{ env.ENVIRONMENT }} ${{ env.ACCOUNT_ID }}
-        env:
-          ENVIRONMENT: dev  # Set environment as needed
-          ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}  # Pass AWS account ID
+    public static void logAsJson(Object logObject) {
+        try {
+            String jsonLog = mapper.writeValueAsString(logObject);
+            logger.info(jsonLog);
+        } catch (Exception e) {
+            logger.error("Error serializing log object to JSON", e);
+        }
+    }
+}
