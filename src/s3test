@@ -1,17 +1,89 @@
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+@Component
+public class DocumentumService {
 
-public class LogUtils {
-    private static final Logger logger = LoggerFactory.getLogger(LogUtils.class);
-    private static final ObjectMapper mapper = new ObjectMapper();
+    @Autowired
+    private SessionFactory sessionFactory;
 
-    public static void logAsJson(Object logObject) {
-        try {
-            String jsonLog = mapper.writeValueAsString(logObject);
-            logger.info(jsonLog);
-        } catch (Exception e) {
-            logger.error("Error serializing log object to JSON", e);
+    public void insertBatchRows(List<TableRow> rows) {
+        try (IDfSession session = sessionFactory.getSession()) {
+            List<String> dqlStatements = buildBatchInsertDQL(rows);
+            for (String dql : dqlStatements) {
+                IDfQuery query = new DfQuery(dql);
+                query.execute(session, IDfQuery.DF_EXEC_QUERY);
+            }
+        } catch (DfException e) {
+            throw new RuntimeException("Error inserting into Documentum", e);
+        }
+    }
+
+    private List<String> buildBatchInsertDQL(List<TableRow> rows) {
+        List<String> dqlStatements = new ArrayList<>();
+        StringBuilder dqlBatch = new StringBuilder("INSERT INTO your_table_name (column1, column2, column3) VALUES ");
+        int count = 0;
+
+        for (TableRow row : rows) {
+            String values = String.format(
+                "('%s', '%s', '%s')",
+                row.getColumn1().replace("'", "''"),
+                row.getColumn2().replace("'", "''"),
+                row.getColumn3().replace("'", "''")
+            );
+
+            if (count > 0) {
+                dqlBatch.append(", ");
+            }
+            dqlBatch.append(values);
+
+            count++;
+
+            if (count == 1000) {
+                dqlStatements.add(dqlBatch.toString());
+                dqlBatch = new StringBuilder("INSERT INTO your_table_name (column1, column2, column3) VALUES ");
+                count = 0;
+            }
+        }
+
+        if (count > 0) {
+            dqlStatements.add(dqlBatch.toString());
+        }
+
+        return dqlStatements;
+    }
+
+    public void deletePreviousDayRecords() {
+        String countDql = "SELECT COUNT(*) AS row_count FROM your_table_name WHERE DATE(created_date) = DATE(SUB(DATE(NOW()), 1))";
+        String deleteDql = "DELETE FROM your_table_name WHERE DATE(created_date) = DATE(SUB(DATE(NOW()), 1)) ENABLE(ROW_BASED) LIMIT 1000";
+
+        try (IDfSession session = sessionFactory.getSession()) {
+            IDfQuery countQuery = new DfQuery(countDql);
+            IDfCollection countResult = countQuery.execute(session, IDfQuery.DF_READ_QUERY);
+
+            int totalRows = 0;
+            if (countResult.next()) {
+                totalRows = countResult.getInt("row_count");
+            }
+            countResult.close();
+
+            if (totalRows == 0) {
+                logger.info("No rows to delete for the previous day.");
+                return;
+            }
+
+            logger.info("Total rows to delete: {}", totalRows);
+
+            int batchSize = 1000;
+            int maxIterations = (totalRows / batchSize) + (totalRows % batchSize > 0 ? 1 : 0);
+
+            for (int i = 0; i < maxIterations; i++) {
+                IDfQuery deleteQuery = new DfQuery(deleteDql);
+                deleteQuery.execute(session, IDfQuery.DF_EXEC_QUERY);
+
+                logger.info("Batch {}/{} completed.", i + 1, maxIterations);
+            }
+
+            logger.info("Deletion process completed.");
+        } catch (DfException e) {
+            throw new RuntimeException("Error deleting previous day's records", e);
         }
     }
 }
