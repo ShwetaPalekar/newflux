@@ -1,93 +1,39 @@
-package com.example.lambdas3documentum.service;
-
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.S3Object;
-import com.documentum.fc.client.IDfSession;
-import com.documentum.fc.client.IDfSysObject;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
-
-@Service
-public class DocumentumService {
+@Component
+public class S3Service {
 
     @Autowired
     private AmazonS3 amazonS3;
 
     @Autowired
-    private IDfSessionManager sessionManager;
+    private DocumentumService documentumService;
 
-    public Result streamFilesToDocumentum(List<String> keys, String bucketName) {
-        Result result = new Result();
-        result.setData("Some data");
+    public void processCsvAndInsert(String bucketName, String key) throws IOException {
+        S3Object s3Object = amazonS3.getObject(bucketName, key);
+        InputStream inputStream = s3Object.getObjectContent();
 
-        try (IDfSession session = sessionManager.getSession("repo")) {
-            session.beginTransaction(); // Start the transaction
+        try (Reader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8)) {
+            Iterable<CSVRecord> records = CSVFormat.DEFAULT.withFirstRecordAsHeader().parse(reader);
+            List<TableRow> batch = new ArrayList<>();
+            int batchSize = 1000;
 
-            List<AnotherClass> anotherClassList = new ArrayList<>();
-            List<IDfSysObject> documentBatch = new ArrayList<>();
+            for (CSVRecord record : records) {
+                TableRow row = new TableRow();
+                row.setColumn1(record.get("column1"));
+                row.setColumn2(record.get("column2"));
+                row.setColumn3(record.get("column3"));
+                batch.add(row);
 
-            for (String key : keys) {
-                try {
-                    S3Object s3Object = amazonS3.getObject(bucketName, key);
-                    InputStream inputStream = s3Object.getObjectContent();
-                    
-                    // Prepare document but don't save it yet
-                    IDfSysObject newDoc = prepareDocument(session, inputStream, key);
-                    documentBatch.add(newDoc);
-
-                    AnotherClass anotherClass = new AnotherClass();
-                    anotherClass.setMoreData("Prepared file: " + key);
-                    anotherClassList.add(anotherClass);
-
-                } catch (Exception e) {
-                    System.err.println("Error preparing file: " + key + " - " + e.getMessage());
-                    AnotherClass failedClass = new AnotherClass();
-                    failedClass.setMoreData("Failed to prepare file: " + key + " due to error: " + e.getMessage());
-                    anotherClassList.add(failedClass);
+                if (batch.size() == batchSize) {
+                    documentumService.insertBatchRows(batch);
+                    batch.clear();
                 }
             }
 
-            // Save all documents in a single transaction
-            try {
-                for (IDfSysObject doc : documentBatch) {
-                    doc.save();
-                }
-                session.commitTransaction();
-                System.out.println("Transaction committed successfully.");
-            } catch (Exception e) {
-                session.abortTransaction();
-                System.err.println("Transaction aborted due to error: " + e.getMessage());
-                // Handle rollback or error reporting
+            if (!batch.isEmpty()) {
+                documentumService.insertBatchRows(batch);
             }
-
-            result.setAnotherClass(anotherClassList);
-
-        } catch (Exception e) {
-            e.printStackTrace();
         }
 
-        return result;
-    }
-
-    private IDfSysObject prepareDocument(IDfSession session, InputStream input, String key) throws Exception {
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        int nRead;
-        byte[] data = new byte[65536]; // 64 KB buffer
-        while ((nRead = input.read(data, 0, data.length)) != -1) {
-            buffer.write(data, 0, nRead);
-        }
-
-        IDfSysObject newDoc = (IDfSysObject) session.newObject("dm_document");
-        newDoc.setObjectName(key);
-        newDoc.setContentType("application/octet-stream");
-        newDoc.setContent(buffer);
-        // Note: Do not call save() here; just return the prepared document
-
-        return newDoc;
+        documentumService.deletePreviousDayRecords();
     }
 }
