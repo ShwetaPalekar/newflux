@@ -1,25 +1,53 @@
-package com.hk.gateway.springgateway;
-import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.test.StepVerifier;
-
-import java.io.InputStream;
-
+@ExtendWith(MockitoExtension.class)
 public class S3ServiceTest {
 
-    private final S3Service s3Service = Mockito.mock(S3Service.class);
+    @InjectMocks
+    private S3Service s3Service;
+
+    @Mock
+    private AmazonS3 amazonS3;
+
+    @Mock
+    private S3Object mockS3Object;
+
+    @Mock
+    private S3ObjectInputStream mockInputStream;
+
+    @Mock
+    private DocumentumService documentumService;
 
     @Test
-    public void testDownloadFromS3() {
-        String objectKey = "test-key";
-        InputStream inputStream = Mockito.mock(InputStream.class);
+    void testProcessCsvAndInsert_success() throws IOException, DfException {
+        // Prepare mock S3 data
+        String csvContent = "column1,column2,column3\nvalue1,value2,value3\nvalue4,value5,value6";
+        InputStream inputStream = new ByteArrayInputStream(csvContent.getBytes(StandardCharsets.UTF_8));
 
-        Mockito.when(s3Service.downloadFromS3(Flux.just(objectKey))).thenReturn(Flux.just(inputStream));
+        when(amazonS3.getObject(anyString(), anyString())).thenReturn(mockS3Object);
+        when(mockS3Object.getObjectContent()).thenReturn(mockInputStream);
+        when(mockInputStream.readAllBytes()).thenReturn(csvContent.getBytes());
 
-        StepVerifier.create(s3Service.downloadFromS3(Flux.just(objectKey)))
-                .expectNext(inputStream)
-                .verifyComplete();
+        // Mock DocumentumService behavior
+        doNothing().when(documentumService).insertBatchRows(anyList());
+        doNothing().when(documentumService).deletePreviousDayRecords();
+
+        // Execute the method
+        s3Service.processCsvAndInsert("test-bucket", "test-key");
+
+        // Verify interactions
+        verify(amazonS3).getObject("test-bucket", "test-key");
+        verify(documentumService, times(1)).insertBatchRows(anyList());
+        verify(documentumService, times(1)).deletePreviousDayRecords();
+    }
+
+    @Test
+    void testProcessCsvAndInsert_handlesIOException() throws IOException {
+        // Simulate an IOException when reading the S3 object
+        when(amazonS3.getObject(anyString(), anyString())).thenThrow(new IOException("Mocked IOException"));
+
+        // Assert exception handling
+        IOException exception = assertThrows(IOException.class, () -> {
+            s3Service.processCsvAndInsert("test-bucket", "test-key");
+        });
+        assertEquals("Mocked IOException", exception.getMessage());
     }
 }
