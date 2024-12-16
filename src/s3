@@ -4,6 +4,7 @@ import com.documentum.fc.client.IDfSession;
 import com.documentum.fc.common.DfException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,52 +18,38 @@ public class DocumentumService {
     @Autowired
     private QueryLoader queryLoader;
 
-    public void insertBatchRows(List<?> rows, String queryName) {
+    /**
+     * Inserts rows into Documentum using batched DQL statements.
+     * 
+     * @param rows      List of rows to insert.
+     * @param queryName Query template name for the insert.
+     */
+    public void insertRowsInBatches(List<?> rows, String queryName) {
         String insertQueryTemplate = queryLoader.loadQuery(queryName);
+        int batchSize = 5000;
 
         try (IDfSession session = sessionFactory.getSession()) {
             session.beginTransaction();
 
-            List<String> dqlStatements = buildBatchInsertDQL(rows, insertQueryTemplate);
-            for (String dql : dqlStatements) {
-                executeDql(session, dql);
+            List<String> dqlBatch = new ArrayList<>();
+            for (int i = 0; i < rows.size(); i++) {
+                dqlBatch.add(formatValues(rows.get(i)));
+
+                if ((i + 1) % batchSize == 0 || i == rows.size() - 1) {
+                    executeBatchInsert(session, insertQueryTemplate, dqlBatch);
+                    dqlBatch.clear(); // Clear batch after execution
+                }
             }
 
             session.commitTransaction();
         } catch (DfException | IllegalAccessException e) {
-            throw new RuntimeException("Error inserting into Documentum", e);
+            throw new RuntimeException("Error inserting rows into Documentum", e);
         }
     }
 
-    private List<String> buildBatchInsertDQL(List<?> rows, String queryTemplate) throws IllegalAccessException {
-        List<String> dqlStatements = new ArrayList<>();
-        StringBuilder dqlBatch = new StringBuilder();
-        int count = 0;
-
-        for (Object row : rows) {
-            String values = formatValues(row);
-            String dql = queryTemplate.replace(":values", values);
-
-            if (count > 0) {
-                dqlBatch.append(" UNION ALL ");
-            }
-            dqlBatch.append(dql);
-            count++;
-
-            if (count == 1000) {
-                dqlStatements.add(dqlBatch.toString());
-                dqlBatch = new StringBuilder();
-                count = 0;
-            }
-        }
-
-        if (count > 0) {
-            dqlStatements.add(dqlBatch.toString());
-        }
-
-        return dqlStatements;
-    }
-
+    /**
+     * Formats a row as a string of values for DQL.
+     */
     private String formatValues(Object row) throws IllegalAccessException {
         StringBuilder valuesBuilder = new StringBuilder("(");
         Field[] fields = row.getClass().getDeclaredFields();
@@ -81,65 +68,19 @@ public class DocumentumService {
         return valuesBuilder.toString();
     }
 
+    /**
+     * Executes a batch insert as a single DQL query.
+     */
+    private void executeBatchInsert(IDfSession session, String queryTemplate, List<String> dqlBatch) throws DfException {
+        StringBuilder batchQuery = new StringBuilder(queryTemplate);
+        batchQuery.append(String.join(", ", dqlBatch));
+        executeDql(session, batchQuery.toString());
+    }
+
+    /**
+     * Executes a single DQL query.
+     */
     private void executeDql(IDfSession session, String dql) throws DfException {
         session.executeQuery(dql, IDfSession.DF_EXEC_QUERY);
     }
-
-    public void deletePreviousDayRecords(String deleteQueryName) {
-        String deleteQuery = queryLoader.loadQuery(deleteQueryName);
-
-        try (IDfSession session = sessionFactory.getSession()) {
-            session.beginTransaction();
-
-            while (true) {
-                int rowsAffected = executeDqlWithCount(session, deleteQuery);
-                if (rowsAffected == 0) {
-                    break;
-                }
-            }
-
-            session.commitTransaction();
-        } catch (DfException e) {
-            throw new RuntimeException("Error deleting previous day's records", e);
-        }
-    }
-
-    private int executeDqlWithCount(IDfSession session, String dql) throws DfException {
-        return session.executeQuery(dql, IDfSession.DF_EXEC_QUERY);
-    }
 }
-
-package com.example.documentum;
-
-import org.springframework.stereotype.Component;
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.stream.Collectors;
-
-@Component
-public class QueryLoader {
-
-    /**
-     * Loads a query from a file in the resources folder.
-     *
-     * @param queryName the name of the query file (e.g., "insert_query.sql")
-     * @return the content of the query file as a string
-     */
-    public String loadQuery(String queryName) {
-        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("queries/" + queryName);
-             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-
-            if (inputStream == null) {
-                throw new IllegalArgumentException("Query file not found: " + queryName);
-            }
-
-            return reader.lines().collect(Collectors.joining(System.lineSeparator()));
-        } catch (Exception e) {
-            throw new RuntimeException("Error loading query: " + queryName, e);
-        }
-    }
-}
-
-INSERT INTO users (emp_id, org_name, payment_id, manager_id, created) VALUES :values
