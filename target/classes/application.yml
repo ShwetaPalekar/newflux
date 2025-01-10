@@ -22,3 +22,23 @@ spring:
           uri: http://localhost:8070
           predicates:
             - Path=/api/v1/schools/**
+
+
+As a developer, I have demonstrated my ability to resolve complex problems efficiently, significantly reducing the occurrence of bugs
+and ensuring high-quality deliverables. My active participation in architectural design discussions has contributed to creating robust 
+and scalable systems. Additionally, I showcased
+adaptability and strategic thinking by successfully pivoting to accommodate critical changes, enabling the generation of multiple outputs in 
+result files seamlessly.
+
+
+In November, I played a pivotal role in ensuring the code was test-ready and successfully met the critical deadline of November 10. 
+Taking a proactive approach, I began addressing performance-related issues in the system, focusing on optimizing efficiency and
+enhancing overall functionality. Throughout the month, I consistently delivered high-quality deliverables, demonstrating my commitment
+to maintaining excellence while meeting project timelines and priorities
+
+
+In December, I successfully resolved two critical performance issues that significantly enhanced system functionality. First, I addressed the system's 
+inability to handle large files, which had been causing breakdowns. My changes ensured the seamless processing of large files, mitigating the issue entirely.
+Second, I introduced threading to replace the single-threaded process that was timing out after 15 minutes. This optimization reduced execution time to just
+5 minutes, showcasing my ability to implement efficient solutions. Additionally, I volunteered to be on call during the shutdown period to
+provide support amidst reduced staffing, demonstrating my reliability and commitment to the team's success
