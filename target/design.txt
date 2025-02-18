@@ -1,0 +1,91 @@
+Design Document: Sequential Batch Processing with Lock Mechanism Using Java Executor
+1. Overview
+This design describes a Java batch system that reads CSV files containing object IDs and deletes the corresponding objects in a Documentum database. The system ensures that only one batch job runs at a time using a lock file mechanism and parallelizes the deletion tasks within the batch using Java ExecutorService. The batch processes multiple CSV files sequentially to prevent concurrent execution.
+
+2. Objectives
+Prevent concurrent execution of batch jobs by using a lock file.
+Sequential processing of multiple CSV files.
+Parallel processing of records within each CSV file for improved performance.
+Graceful shutdown of the ExecutorService to ensure all tasks complete.
+Move processed CSVs to an archive folder to track progress.
+3. Components
+Lock Mechanism: A lock file (batch.lock) is used to ensure that only one batch job runs at a time.
+ExecutorService: Manages parallel processing of records (deleting objects from Documentum) to optimize performance.
+CSV Files: The input files that contain object IDs to be deleted.
+Processed Files: CSV files are moved to this folder after successful processing.
+Java Application: The core batch job that implements the logic for reading CSV files, parallel processing, and managing lock files.
+4. Functional Design
+4.1 Lock Mechanism
+Check for Lock File: Before starting the batch process, the system checks if the batch.lock file exists in the batch directory. If it does, the batch exits immediately to avoid concurrent execution.
+Create Lock File: If the lock file doesn't exist, it is created at the start of the batch to signal that the batch is running.
+Delete Lock File: After the batch completes, the lock file is deleted to allow subsequent batch jobs to run.
+4.2 CSV Processing
+Sequential CSV Processing: All CSV files in the input folder are processed one by one. Once a CSV is processed, it is moved to the processed folder to prevent re-processing.
+Read and Process Records: For each CSV, the batch reads each line and submits parallel tasks to the ExecutorService for processing.
+4.3 Parallel Processing with ExecutorService
+ExecutorService Configuration: A fixed thread pool is used to execute parallel tasks. The batch processes 4 records concurrently by default (configurable).
+Submit Parallel Tasks: Each record in the CSV triggers a task to delete the corresponding object in the Documentum database.
+Task Completion: The ExecutorService waits for all tasks to complete before finishing the batch.
+4.4 Error Handling and Task Management
+Graceful Executor Shutdown: The ExecutorService is gracefully shut down once all tasks are completed. The system ensures that all tasks finish before the batch terminates.
+Error Logging: Errors during CSV processing or object deletion are logged to a log file for troubleshooting.
+5. Architecture Flow
+5.1 High-Level Process Flow
+Check for Lock File:
+
+If batch.lock exists → exit process.
+If batch.lock does not exist → create lock file.
+Process CSV Files Sequentially:
+
+List all CSV files in the input folder.
+Process each CSV one at a time:
+Open CSV file and read records.
+Submit parallel tasks to delete objects by ID.
+Move processed CSV to the processed folder.
+ExecutorService Parallel Task Execution:
+
+Each record (object ID) is submitted as a task for deletion.
+Wait for all tasks to complete.
+Delete Lock File: Once all CSV files are processed, remove batch.lock file to signal completion.
+
+Completion: The batch job terminates once all files are processed, tasks are completed, and lock file is deleted.
+
+6. Detailed Implementation
+6.1 Lock File Operations
+File Existence Check:
+The batch job checks for batch.lock in the directory. If found, the batch exits.
+Creating Lock File:
+createLockFile() creates batch.lock in the specified directory to signal batch job execution.
+Deleting Lock File:
+After the batch completes successfully, deleteLockFile() removes the lock file to allow subsequent batches to run.
+6.2 CSV File Processing
+The batch reads all CSV files from the input folder.
+Each file is processed sequentially to ensure that they do not run in parallel.
+After processing a CSV, it is moved to the processed folder.
+6.3 Parallel Record Processing
+The batch uses ExecutorService to parallelize the processing of records within each CSV.
+A fixed thread pool (Executors.newFixedThreadPool(4)) is used to process up to 4 records simultaneously. Adjust the pool size based on available system resources.
+6.4 Deleting Objects from Documentum
+The batch simulates deleting objects from Documentum by calling the deleteObjectById() method for each record.
+This method should be replaced with the actual document.destroy() method from the Documentum API.
+6.5 ExecutorService Management
+The ExecutorService is managed by calling shutdown() to prevent new tasks from being submitted.
+The system waits for all tasks to complete using awaitTermination().
+7. Error Handling
+IOException: Captured during CSV reading. If a CSV cannot be read, it is logged, and the batch continues to the next file.
+InterruptedException: Handled in the parallel task deletion to ensure graceful interruption.
+Task Execution Failure: Errors in task execution (e.g., Documentum deletion) are logged for investigation.
+8. Scheduling the Batch Job
+The batch job can be scheduled using Windows Task Scheduler to run at specific intervals (e.g., every hour or daily):
+
+Create a Scheduled Task in Windows Task Scheduler.
+Set the trigger to schedule the batch (e.g., daily or at fixed intervals).
+Action: Set the action to execute the Java batch using:
+java -jar BatchProcessor.jar
+
+10. Summary of Design
+Lock File ensures that only one batch job runs at a time.
+Sequential CSV Processing prevents race conditions in processing.
+ExecutorService facilitates parallel processing of deletion tasks.
+Error Handling ensures robustness and logging for debugging.
+Windows Task Scheduler automates batch execution at scheduled intervals.
