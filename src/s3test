@@ -1,89 +1,61 @@
-@Component
-public class DocumentumService {
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import archiver from "archiver";
 
-    @Autowired
-    private SessionFactory sessionFactory;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-    public void insertBatchRows(List<TableRow> rows) {
-        try (IDfSession session = sessionFactory.getSession()) {
-            List<String> dqlStatements = buildBatchInsertDQL(rows);
-            for (String dql : dqlStatements) {
-                IDfQuery query = new DfQuery(dql);
-                query.execute(session, IDfQuery.DF_EXEC_QUERY);
-            }
-        } catch (DfException e) {
-            throw new RuntimeException("Error inserting into Documentum", e);
-        }
-    }
+// Configuration
+const outputDir = path.join(__dirname, "output_zips");
+const sizesInMB = [10, 100, 500, 1024, 2048, 5120, 8192, 10240]; // in MB
+const maxFiles = 200;
 
-    private List<String> buildBatchInsertDQL(List<TableRow> rows) {
-        List<String> dqlStatements = new ArrayList<>();
-        StringBuilder dqlBatch = new StringBuilder("INSERT INTO your_table_name (column1, column2, column3) VALUES ");
-        int count = 0;
+if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
 
-        for (TableRow row : rows) {
-            String values = String.format(
-                "('%s', '%s', '%s')",
-                row.getColumn1().replace("'", "''"),
-                row.getColumn2().replace("'", "''"),
-                row.getColumn3().replace("'", "''")
-            );
-
-            if (count > 0) {
-                dqlBatch.append(", ");
-            }
-            dqlBatch.append(values);
-
-            count++;
-
-            if (count == 1000) {
-                dqlStatements.add(dqlBatch.toString());
-                dqlBatch = new StringBuilder("INSERT INTO your_table_name (column1, column2, column3) VALUES ");
-                count = 0;
-            }
-        }
-
-        if (count > 0) {
-            dqlStatements.add(dqlBatch.toString());
-        }
-
-        return dqlStatements;
-    }
-
-    public void deletePreviousDayRecords() {
-        String countDql = "SELECT COUNT(*) AS row_count FROM your_table_name WHERE DATE(created_date) = DATE(SUB(DATE(NOW()), 1))";
-        String deleteDql = "DELETE FROM your_table_name WHERE DATE(created_date) = DATE(SUB(DATE(NOW()), 1)) ENABLE(ROW_BASED) LIMIT 1000";
-
-        try (IDfSession session = sessionFactory.getSession()) {
-            IDfQuery countQuery = new DfQuery(countDql);
-            IDfCollection countResult = countQuery.execute(session, IDfQuery.DF_READ_QUERY);
-
-            int totalRows = 0;
-            if (countResult.next()) {
-                totalRows = countResult.getInt("row_count");
-            }
-            countResult.close();
-
-            if (totalRows == 0) {
-                logger.info("No rows to delete for the previous day.");
-                return;
-            }
-
-            logger.info("Total rows to delete: {}", totalRows);
-
-            int batchSize = 1000;
-            int maxIterations = (totalRows / batchSize) + (totalRows % batchSize > 0 ? 1 : 0);
-
-            for (int i = 0; i < maxIterations; i++) {
-                IDfQuery deleteQuery = new DfQuery(deleteDql);
-                deleteQuery.execute(session, IDfQuery.DF_EXEC_QUERY);
-
-                logger.info("Batch {}/{} completed.", i + 1, maxIterations);
-            }
-
-            logger.info("Deletion process completed.");
-        } catch (DfException e) {
-            throw new RuntimeException("Error deleting previous day's records", e);
-        }
-    }
+function getRandomBuffer(sizeInBytes) {
+  return Buffer.alloc(sizeInBytes, Math.floor(Math.random() * 256));
 }
+
+function getRandomFileName(index) {
+  const ext = Math.random() > 0.5 ? "txt" : "pdf";
+  return `file_${index}.${ext}`;
+}
+
+async function createZip(targetSizeMB) {
+  const zipName = `zip_${targetSizeMB}MB.zip`;
+  const zipPath = path.join(outputDir, zipName);
+  const output = fs.createWriteStream(zipPath);
+  const archive = archiver("zip", { zlib: { level: 1 } }); // Fastest compression
+
+  return new Promise((resolve, reject) => {
+    output.on("close", () => {
+      console.log(`${zipName} created with size: ${(archive.pointer() / 1024 / 1024).toFixed(2)} MB`);
+      resolve();
+    });
+
+    archive.on("error", err => reject(err));
+    archive.pipe(output);
+
+    const totalBytes = targetSizeMB * 1024 * 1024;
+    const bytesPerFile = Math.floor(totalBytes / maxFiles);
+    for (let i = 0; i < maxFiles; i++) {
+      const fileName = getRandomFileName(i + 1);
+      archive.append(getRandomBuffer(bytesPerFile), { name: fileName });
+    }
+
+    archive.finalize();
+  });
+}
+
+async function main() {
+  console.log("Generating test ZIPs...");
+  for (const size of sizesInMB) {
+    await createZip(size);
+  }
+  console.log("✅ All ZIPs created in:", outputDir);
+}
+
+main().catch(err => console.error("Error:", err));
+// npm install archiver
+// node create-test-zips.js
