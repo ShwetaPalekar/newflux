@@ -1,86 +1,76 @@
-package com.example.documentum;
+import { Upload } from '@aws-sdk/lib-storage';
+import { S3Client } from '@aws-sdk/client-s3';
+import { pipeline } from 'stream/promises';
+import * as unzipper from 'unzipper';
+import path from 'path';
+import pLimit from 'p-limit';
 
-import com.documentum.fc.client.IDfSession;
-import com.documentum.fc.common.DfException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+// Constants (replace these with your app's constants)
+const APP = {
+  UNZIPPER_TYPES: { FILE: 'File' },
+  EXTENSION: { O: '.o', I: '.i', AFP: '.afp' },
+  S3_FOLDER: { INPROCESS: 'inprocess' },
+  ERROR_TYPE: { UNZIP_UPLOAD: 'UNZIP_UPLOAD' }
+};
 
-import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.List;
+const s3 = new S3Client({ region: 'your-region' });
 
-@Service
-public class DocumentumService {
+export async function unzipAndUploadFilesToS3(
+  Bucket: string,
+  s3ObjectStream: NodeJS.ReadableStream,
+  batchName: string
+): Promise<string[]> {
+  const fileList: string[] = [];
+  const limit = pLimit(10); // Limit concurrency to 10 uploads at once
+  const uploadTasks: Promise<any>[] = [];
 
-    @Autowired
-    private SessionFactory sessionFactory;
+  const zipStream = s3ObjectStream.pipe(unzipper.Parse({ forceStream: true }));
 
-    @Autowired
-    private QueryLoader queryLoader;
-
-    /**
-     * Inserts rows into Documentum using batched DQL statements.
-     * 
-     * @param rows      List of rows to insert.
-     * @param queryName Query template name for the insert.
-     */
-    public void insertRowsInBatches(List<?> rows, String queryName) {
-        String insertQueryTemplate = queryLoader.loadQuery(queryName);
-        int batchSize = 5000;
-
-        try (IDfSession session = sessionFactory.getSession()) {
-            session.beginTransaction();
-
-            List<String> dqlBatch = new ArrayList<>();
-            for (int i = 0; i < rows.size(); i++) {
-                dqlBatch.add(formatValues(rows.get(i)));
-
-                if ((i + 1) % batchSize == 0 || i == rows.size() - 1) {
-                    executeBatchInsert(session, insertQueryTemplate, dqlBatch);
-                    dqlBatch.clear(); // Clear batch after execution
-                }
-            }
-
-            session.commitTransaction();
-        } catch (DfException | IllegalAccessException e) {
-            throw new RuntimeException("Error inserting rows into Documentum", e);
-        }
+  for await (const fileEntry of zipStream) {
+    if (fileEntry.type !== APP.UNZIPPER_TYPES.FILE) {
+      fileEntry.autodrain();
+      continue;
     }
 
-    /**
-     * Formats a row as a string of values for DQL.
-     */
-    private String formatValues(Object row) throws IllegalAccessException {
-        StringBuilder valuesBuilder = new StringBuilder("(");
-        Field[] fields = row.getClass().getDeclaredFields();
+    let nameOfFile = path.basename(fileEntry.path);
 
-        for (int i = 0; i < fields.length; i++) {
-            fields[i].setAccessible(true);
-            Object value = fields[i].get(row);
-            valuesBuilder.append(value == null ? "NULL" : "'" + value.toString().replace("'", "''") + "'");
+    // Normalize and lower-case the filename
+    nameOfFile = nameOfFile.replace(/\\/g, '/').split('/').pop() ?? '';
+    nameOfFile = nameOfFile.toLowerCase();
 
-            if (i < fields.length - 1) {
-                valuesBuilder.append(", ");
-            }
-        }
-
-        valuesBuilder.append(")");
-        return valuesBuilder.toString();
+    // Optional extension logic
+    if (!nameOfFile.endsWith(APP.EXTENSION.O) &&
+        !nameOfFile.endsWith(APP.EXTENSION.I) &&
+        !nameOfFile.endsWith(APP.EXTENSION.AFP)) {
+      nameOfFile = nameOfFile.slice(0, -2) + APP.EXTENSION.AFP;
     }
 
-    /**
-     * Executes a batch insert as a single DQL query.
-     */
-    private void executeBatchInsert(IDfSession session, String queryTemplate, List<String> dqlBatch) throws DfException {
-        StringBuilder batchQuery = new StringBuilder(queryTemplate);
-        batchQuery.append(String.join(", ", dqlBatch));
-        executeDql(session, batchQuery.toString());
-    }
+    const uploadParams = {
+      Bucket,
+      Key: `${batchName}/${APP.S3_FOLDER.INPROCESS}/${nameOfFile}`,
+      Body: fileEntry
+    };
 
-    /**
-     * Executes a single DQL query.
-     */
-    private void executeDql(IDfSession session, String dql) throws DfException {
-        session.executeQuery(dql, IDfSession.DF_EXEC_QUERY);
+    // Push throttled upload promise
+    const uploadPromise = limit(async () => {
+      await new Upload({ client: s3, params: uploadParams }).done();
+      fileList.push(`${batchName}/${APP.S3_FOLDER.INPROCESS}/${nameOfFile}`);
+    });
+
+    uploadTasks.push(uploadPromise());
+  }
+
+  // Await all uploads
+  const results = await Promise.allSettled(uploadTasks);
+
+  // Throw if any failed
+  results.forEach((result) => {
+    if (result.status === 'rejected') {
+      throw new Error(
+        `${APP.ERROR_TYPE.UNZIP_UPLOAD}: ${result.reason?.message ?? 'Unknown error'}`
+      );
     }
+  });
+
+  return fileList;
 }
