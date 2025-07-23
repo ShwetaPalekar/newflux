@@ -1,17 +1,18 @@
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
-import { S3Client } from '@aws-sdk/client-s3';
-import { pipeline } from 'stream/promises';
-import * as unzipper from 'unzipper';
-import path from 'path';
+import unzipper from 'unzipper';
 import pLimit from 'p-limit';
+import path from 'path';
 
-// Constants (replace these with your app's constants)
 const APP = {
   UNZIPPER_TYPES: { FILE: 'File' },
   EXTENSION: { O: '.o', I: '.i', AFP: '.afp' },
   S3_FOLDER: { INPROCESS: 'inprocess' },
   ERROR_TYPE: { UNZIP_UPLOAD: 'UNZIP_UPLOAD' }
 };
+
+const CHUNK_SIZE_MB = 15;
+const CONCURRENCY_LIMIT = 25;
 
 const s3 = new S3Client({ region: 'your-region' });
 
@@ -21,8 +22,8 @@ export async function unzipAndUploadFilesToS3(
   batchName: string
 ): Promise<string[]> {
   const fileList: string[] = [];
-  const limit = pLimit(10); // Limit concurrency to 10 uploads at once
-  const uploadTasks: Promise<any>[] = [];
+  const limit = pLimit(CONCURRENCY_LIMIT);
+  const uploadTasks: Promise<void>[] = [];
 
   const zipStream = s3ObjectStream.pipe(unzipper.Parse({ forceStream: true }));
 
@@ -32,43 +33,58 @@ export async function unzipAndUploadFilesToS3(
       continue;
     }
 
-    let nameOfFile = path.basename(fileEntry.path);
+    let nameOfFile = path.basename(fileEntry.path).toLowerCase();
 
-    // Normalize and lower-case the filename
-    nameOfFile = nameOfFile.replace(/\\/g, '/').split('/').pop() ?? '';
-    nameOfFile = nameOfFile.toLowerCase();
-
-    // Optional extension logic
+    // Adjust extension if needed
     if (!nameOfFile.endsWith(APP.EXTENSION.O) &&
         !nameOfFile.endsWith(APP.EXTENSION.I) &&
         !nameOfFile.endsWith(APP.EXTENSION.AFP)) {
       nameOfFile = nameOfFile.slice(0, -2) + APP.EXTENSION.AFP;
     }
 
-    const uploadParams = {
-      Bucket,
-      Key: `${batchName}/${APP.S3_FOLDER.INPROCESS}/${nameOfFile}`,
-      Body: fileEntry
-    };
+    const fileBufferChunks: Uint8Array[] = [];
+    let totalSize = 0;
 
-    // Push throttled upload promise
+    for await (const chunk of fileEntry) {
+      fileBufferChunks.push(chunk);
+      totalSize += chunk.length;
+    }
+
+    const fileBuffer = Buffer.concat(fileBufferChunks);
+    const useManagedUpload = totalSize > CHUNK_SIZE_MB * 1024 * 1024;
+
+    const key = `${batchName}/${APP.S3_FOLDER.INPROCESS}/${nameOfFile}`;
+
     const uploadPromise = limit(async () => {
-      await new Upload({ client: s3, params: uploadParams }).done();
-      fileList.push(`${batchName}/${APP.S3_FOLDER.INPROCESS}/${nameOfFile}`);
+      const start = Date.now();
+
+      if (useManagedUpload) {
+        await new Upload({
+          client: s3,
+          params: { Bucket, Key: key, Body: fileBuffer }
+        }).done();
+      } else {
+        await s3.send(new PutObjectCommand({
+          Bucket,
+          Key: key,
+          Body: fileBuffer
+        }));
+      }
+
+      const end = Date.now();
+      console.log(`Uploaded ${nameOfFile} (${(totalSize / 1024 / 1024).toFixed(2)} MB) in ${(end - start) / 1000}s`);
+
+      fileList.push(key);
     });
 
-    uploadTasks.push(uploadPromise());
+    uploadTasks.push(uploadPromise);
   }
 
-  // Await all uploads
   const results = await Promise.allSettled(uploadTasks);
 
-  // Throw if any failed
   results.forEach((result) => {
     if (result.status === 'rejected') {
-      throw new Error(
-        `${APP.ERROR_TYPE.UNZIP_UPLOAD}: ${result.reason?.message ?? 'Unknown error'}`
-      );
+      throw new Error(`${APP.ERROR_TYPE.UNZIP_UPLOAD}: ${result.reason?.message ?? 'Unknown error'}`);
     }
   });
 
