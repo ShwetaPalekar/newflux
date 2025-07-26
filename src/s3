@@ -1,92 +1,123 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { Upload } from '@aws-sdk/lib-storage';
-import unzipper from 'unzipper';
-import pLimit from 'p-limit';
-import path from 'path';
+// index.js
+const unzipper = require('unzipper');
+const { S3Client, GetObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand } = require('@aws-sdk/client-s3');
 
-const APP = {
-  UNZIPPER_TYPES: { FILE: 'File' },
-  EXTENSION: { O: '.o', I: '.i', AFP: '.afp' },
-  S3_FOLDER: { INPROCESS: 'inprocess' },
-  ERROR_TYPE: { UNZIP_UPLOAD: 'UNZIP_UPLOAD' }
-};
+const s3 = new S3Client();
+const TARGET_BUCKET = process.env.TARGET_BUCKET;
+const CONCURRENCY_LIMIT = 3;
 
-const CHUNK_SIZE_MB = 15;
-const CONCURRENCY_LIMIT = 25;
+exports.handler = async (event) => {
+  const record = event.Records[0];
+  const srcBucket = record.s3.bucket.name;
+  const zipKey = decodeURIComponent(record.s3.object.key.replace(/\+/g, ' '));
 
-const s3 = new S3Client({ region: 'your-region' });
+  const zipStream = await getS3ObjectStream(srcBucket, zipKey);
+  const directory = zipStream.pipe(unzipper.Parse());
 
-export async function unzipAndUploadFilesToS3(
-  Bucket: string,
-  s3ObjectStream: NodeJS.ReadableStream,
-  batchName: string
-): Promise<string[]> {
-  const fileList: string[] = [];
-  const limit = pLimit(CONCURRENCY_LIMIT);
-  const uploadTasks: Promise<void>[] = [];
+  const fileUploadPromises = [];
 
-  const zipStream = s3ObjectStream.pipe(unzipper.Parse({ forceStream: true }));
-
-  for await (const fileEntry of zipStream) {
-    if (fileEntry.type !== APP.UNZIPPER_TYPES.FILE) {
-      fileEntry.autodrain();
-      continue;
+  for await (const entry of directory) {
+    if (entry.type === 'File') {
+      fileUploadPromises.push(
+        throttle(() => streamToS3(entry, entry.path), CONCURRENCY_LIMIT)
+      );
+    } else {
+      entry.autodrain(); // skip folders
     }
-
-    let nameOfFile = path.basename(fileEntry.path).toLowerCase();
-
-    // Adjust extension if needed
-    if (!nameOfFile.endsWith(APP.EXTENSION.O) &&
-        !nameOfFile.endsWith(APP.EXTENSION.I) &&
-        !nameOfFile.endsWith(APP.EXTENSION.AFP)) {
-      nameOfFile = nameOfFile.slice(0, -2) + APP.EXTENSION.AFP;
-    }
-
-    const fileBufferChunks: Uint8Array[] = [];
-    let totalSize = 0;
-
-    for await (const chunk of fileEntry) {
-      fileBufferChunks.push(chunk);
-      totalSize += chunk.length;
-    }
-
-    const fileBuffer = Buffer.concat(fileBufferChunks);
-    const useManagedUpload = totalSize > CHUNK_SIZE_MB * 1024 * 1024;
-
-    const key = `${batchName}/${APP.S3_FOLDER.INPROCESS}/${nameOfFile}`;
-
-    const uploadPromise = limit(async () => {
-      const start = Date.now();
-
-      if (useManagedUpload) {
-        await new Upload({
-          client: s3,
-          params: { Bucket, Key: key, Body: fileBuffer }
-        }).done();
-      } else {
-        await s3.send(new PutObjectCommand({
-          Bucket,
-          Key: key,
-          Body: fileBuffer
-        }));
-      }
-
-      const end = Date.now();
-      console.log(`Uploaded ${nameOfFile} (${(totalSize / 1024 / 1024).toFixed(2)} MB) in ${(end - start) / 1000}s`);
-
-      fileList.push(key);
-    });
-
-    uploadTasks.push(uploadPromise);
   }
 
-  const results = await Promise.allSettled(uploadTasks);
+  // Wait for all uploads to finish
+  await Promise.all(fileUploadPromises);
+  console.log('All files uploaded.');
+};
 
-  results.forEach((result) => {
-    if (result.status === 'rejected') {
-      throw new Error(`${APP.ERROR_TYPE.UNZIP_UPLOAD}: ${result.reason?.message ?? 'Unknown error'}`);
-    }
+// Get input stream from S3
+async function getS3ObjectStream(bucket, key) {
+  const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+  const response = await s3.send(command);
+  return response.Body;
+}
+
+// Upload using multipart streaming
+async function streamToS3(entryStream, targetKey) {
+  const upload = await s3.send(new CreateMultipartUploadCommand({
+    Bucket: TARGET_BUCKET,
+    Key: targetKey
+  }));
+
+  const partSize = 8 * 1024 * 1024; // 8 MB
+  const parts = [];
+  let partNumber = 1;
+  let buffer = Buffer.alloc(0);
+
+  return new Promise((resolve, reject) => {
+    entryStream.on('data', async (chunk) => {
+      buffer = Buffer.concat([buffer, chunk]);
+
+      while (buffer.length >= partSize) {
+        const partBuffer = buffer.slice(0, partSize);
+        buffer = buffer.slice(partSize);
+
+        const uploadPart = await s3.send(new UploadPartCommand({
+          Bucket: TARGET_BUCKET,
+          Key: targetKey,
+          UploadId: upload.UploadId,
+          PartNumber: partNumber,
+          Body: partBuffer,
+        }));
+
+        parts.push({
+          ETag: uploadPart.ETag,
+          PartNumber: partNumber++
+        });
+      }
+    });
+
+    entryStream.on('end', async () => {
+      if (buffer.length > 0) {
+        const uploadPart = await s3.send(new UploadPartCommand({
+          Bucket: TARGET_BUCKET,
+          Key: targetKey,
+          UploadId: upload.UploadId,
+          PartNumber: partNumber,
+          Body: buffer,
+        }));
+        parts.push({
+          ETag: uploadPart.ETag,
+          PartNumber: partNumber
+        });
+      }
+
+      await s3.send(new CompleteMultipartUploadCommand({
+        Bucket: TARGET_BUCKET,
+        Key: targetKey,
+        UploadId: upload.UploadId,
+        MultipartUpload: { Parts: parts }
+      }));
+      console.log(`Uploaded: ${targetKey}`);
+      resolve();
+    });
+
+    entryStream.on('error', async (err) => {
+      await s3.send(new AbortMultipartUploadCommand({
+        Bucket: TARGET_BUCKET,
+        Key: targetKey,
+        UploadId: upload.UploadId
+      }));
+      reject(err);
+    });
   });
+}
 
-  return fileList;
+// Throttle concurrency
+const inFlight = [];
+async function throttle(fn, limit) {
+  while (inFlight.length >= limit) {
+    await Promise.race(inFlight);
+  }
+  const p = fn().finally(() => {
+    inFlight.splice(inFlight.indexOf(p), 1);
+  });
+  inFlight.push(p);
+  return p;
 }
