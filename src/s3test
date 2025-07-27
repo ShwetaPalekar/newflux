@@ -1,63 +1,64 @@
-import { S3Client } from "@aws-sdk/client-s3";
-import { Upload } from "@aws-sdk/lib-storage";
-import unzipper from "unzipper"; // or yauzl, etc.
-import { Readable } from "stream";
+const { S3Client, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
+const unzipper = require('unzipper');
+const { PassThrough } = require('stream');
+const { pipeline } = require('stream/promises');
+const pLimit = require('p-limit');
 
-const s3 = new S3Client({});
+const s3 = new S3Client();
+const CONCURRENCY = 20;
 
-async function streamZipEntriesToS3(zipStream, bucketName, prefix = '') {
-  return new Promise((resolve, reject) => {
-    const uploads = [];
+exports.handler = async (event) => {
+  const startTime = Date.now();
+  const sourceBucket = 'your-source-bucket';
+  const sourceKey = 'your-source-key.zip';
+  const targetBucket = 'your-output-bucket';
 
-    zipStream
-      .pipe(unzipper.Parse())
-      .on("entry", async (entry) => {
-        const { path, type } = entry;
+  console.log(`Starting unzip & upload: s3://${sourceBucket}/${sourceKey}`);
 
-        if (type === "File") {
-          const upload = new Upload({
-            client: s3,
-            params: {
-              Bucket: bucketName,
-              Key: `${prefix}${path}`,
-              Body: entry, // <-- directly stream to S3
-            },
-            queueSize: 4,
-            leavePartsOnError: false,
-          });
+  const zipStream = await getS3ZipStream(sourceBucket, sourceKey);
+  const zip = zipStream.pipe(unzipper.Parse());
+  const limit = pLimit(CONCURRENCY);
+  const uploadTasks = [];
 
-          upload.on("httpUploadProgress", (progress) => {
-            console.log(`Uploading ${path}:`, progress);
-          });
+  for await (const entry of zip) {
+    if (entry.type === 'File') {
+      const fileName = entry.path;
 
-          uploads.push(upload.done());
-        } else {
-          entry.autodrain();
-        }
-      })
-      .on("error", reject)
-      .on("close", async () => {
-        try {
-          await Promise.all(uploads);
-          resolve();
-        } catch (err) {
-          reject(err);
-        }
+      const task = limit(async () => {
+        const fileStart = Date.now();
+        const uploadStream = new PassThrough();
+
+        const uploadPromise = s3.send(new PutObjectCommand({
+          Bucket: targetBucket,
+          Key: `unzipped/${fileName}`,
+          Body: uploadStream,
+        }));
+
+        await Promise.all([
+          pipeline(entry, uploadStream),
+          uploadPromise,
+        ]);
+
+        const fileEnd = Date.now();
+        console.log(`Uploaded ${fileName} in ${(fileEnd - fileStart) / 1000}s`);
       });
-  });
+
+      uploadTasks.push(task());
+    } else {
+      entry.autodrain(); // important for directories, symlinks, etc.
+    }
+  }
+
+  // Wait for all uploads to complete
+  await Promise.all(uploadTasks);
+  await s3.destroy(); // close all sockets
+
+  const totalTime = (Date.now() - startTime) / 1000;
+  console.log(`All files uploaded. Total time: ${totalTime}s`);
+};
+
+// Helper to get zip file stream from S3
+async function getS3ZipStream(bucket, key) {
+  const response = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  return response.Body;
 }
-```
-
-### ✔️ How to use it:
-```js
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
-
-const zipFileStream = await s3.send(new GetObjectCommand({
-  Bucket: "source-bucket",
-  Key: "path/to/zipfile.zip"
-})).then(res => res.Body); // res.Body is a readable stream
-
-await streamZipEntriesToS3(zipFileStream, "destination-bucket", "unzipped/");
-```
-
----
