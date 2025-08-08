@@ -1,123 +1,88 @@
-// index.js
-const unzipper = require('unzipper');
-const { S3Client, GetObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand } = require('@aws-sdk/client-s3');
+import { S3Client, HeadObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import yauzl from "yauzl";
+import { PassThrough } from "stream";
 
-const s3 = new S3Client();
-const TARGET_BUCKET = process.env.TARGET_BUCKET;
-const CONCURRENCY_LIMIT = 3;
+const s3 = new S3Client({});
 
-exports.handler = async (event) => {
-  const record = event.Records[0];
-  const srcBucket = record.s3.bucket.name;
-  const zipKey = decodeURIComponent(record.s3.object.key.replace(/\+/g, ' '));
+export const handler = async (event) => {
+  const { bucket, zipKey, targetFile } = event;
 
-  const zipStream = await getS3ObjectStream(srcBucket, zipKey);
-  const directory = zipStream.pipe(unzipper.Parse());
+  console.log(`Extracting "${targetFile}" from "${zipKey}" in "${bucket}"`);
 
-  const fileUploadPromises = [];
-
-  for await (const entry of directory) {
-    if (entry.type === 'File') {
-      fileUploadPromises.push(
-        throttle(() => streamToS3(entry, entry.path), CONCURRENCY_LIMIT)
-      );
-    } else {
-      entry.autodrain(); // skip folders
-    }
-  }
-
-  // Wait for all uploads to finish
-  await Promise.all(fileUploadPromises);
-  console.log('All files uploaded.');
-};
-
-// Get input stream from S3
-async function getS3ObjectStream(bucket, key) {
-  const command = new GetObjectCommand({ Bucket: bucket, Key: key });
-  const response = await s3.send(command);
-  return response.Body;
-}
-
-// Upload using multipart streaming
-async function streamToS3(entryStream, targetKey) {
-  const upload = await s3.send(new CreateMultipartUploadCommand({
-    Bucket: TARGET_BUCKET,
-    Key: targetKey
+  // Step 1: Get ZIP size for yauzl
+  const head = await s3.send(new HeadObjectCommand({
+    Bucket: bucket,
+    Key: zipKey
   }));
-
-  const partSize = 8 * 1024 * 1024; // 8 MB
-  const parts = [];
-  let partNumber = 1;
-  let buffer = Buffer.alloc(0);
+  const contentLength = head.ContentLength;
 
   return new Promise((resolve, reject) => {
-    entryStream.on('data', async (chunk) => {
-      buffer = Buffer.concat([buffer, chunk]);
+    yauzl.fromRandomAccessReader(
+      new S3RandomAccessReader(bucket, zipKey),
+      contentLength,
+      { lazyEntries: true },
+      (err, zipfile) => {
+        if (err) return reject(err);
 
-      while (buffer.length >= partSize) {
-        const partBuffer = buffer.slice(0, partSize);
-        buffer = buffer.slice(partSize);
+        let found = false;
 
-        const uploadPart = await s3.send(new UploadPartCommand({
-          Bucket: TARGET_BUCKET,
-          Key: targetKey,
-          UploadId: upload.UploadId,
-          PartNumber: partNumber,
-          Body: partBuffer,
-        }));
+        zipfile.readEntry();
 
-        parts.push({
-          ETag: uploadPart.ETag,
-          PartNumber: partNumber++
+        zipfile.on("entry", (entry) => {
+          if (entry.fileName === targetFile) {
+            found = true;
+            console.log(`Found target file: ${entry.fileName}`);
+
+            zipfile.openReadStream(entry, async (err, readStream) => {
+              if (err) return reject(err);
+
+              try {
+                // Upload directly to S3 (no /tmp usage)
+                await s3.send(new PutObjectCommand({
+                  Bucket: bucket,
+                  Key: `extracted/${targetFile}`,
+                  Body: readStream
+                }));
+
+                console.log(`Uploaded to s3://${bucket}/extracted/${targetFile}`);
+                zipfile.close();
+                resolve({ status: "success", file: targetFile });
+              } catch (uploadErr) {
+                reject(uploadErr);
+              }
+            });
+          } else {
+            // Skip and read next entry
+            zipfile.readEntry();
+          }
         });
-      }
-    });
 
-    entryStream.on('end', async () => {
-      if (buffer.length > 0) {
-        const uploadPart = await s3.send(new UploadPartCommand({
-          Bucket: TARGET_BUCKET,
-          Key: targetKey,
-          UploadId: upload.UploadId,
-          PartNumber: partNumber,
-          Body: buffer,
-        }));
-        parts.push({
-          ETag: uploadPart.ETag,
-          PartNumber: partNumber
+        zipfile.on("end", () => {
+          if (!found) reject(new Error(`"${targetFile}" not found in ZIP`));
         });
+
+        zipfile.on("error", reject);
       }
-
-      await s3.send(new CompleteMultipartUploadCommand({
-        Bucket: TARGET_BUCKET,
-        Key: targetKey,
-        UploadId: upload.UploadId,
-        MultipartUpload: { Parts: parts }
-      }));
-      console.log(`Uploaded: ${targetKey}`);
-      resolve();
-    });
-
-    entryStream.on('error', async (err) => {
-      await s3.send(new AbortMultipartUploadCommand({
-        Bucket: TARGET_BUCKET,
-        Key: targetKey,
-        UploadId: upload.UploadId
-      }));
-      reject(err);
-    });
+    );
   });
-}
+};
 
-// Throttle concurrency
-const inFlight = [];
-async function throttle(fn, limit) {
-  while (inFlight.length >= limit) {
-    await Promise.race(inFlight);
+// Random access reader for yauzl (S3 streaming, SDK v3)
+class S3RandomAccessReader extends yauzl.RandomAccessReader {
+  constructor(bucket, key) {
+    super();
+    this.bucket = bucket;
+    this.key = key;
   }
-  const p = fn().finally(() => {
-    inFlight.splice(inFlight.indexOf(p), 1);
-  });
-  inFlight.push(p);
-  return p;
+
+  _readStreamForRange(start, end) {
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: this.key,
+      Range: `bytes=${start}-${end - 1}`
+    });
+    return s3.send(command).then(resp => resp.Body);
+  }
+
+  _destroy(cb) { cb(); }
 }
