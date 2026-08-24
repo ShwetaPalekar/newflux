@@ -1,0 +1,568 @@
+Chapter 1: Spring-Framework 22
+What is Spring Framework? 22
+What is Inversion of control? 22
+What is Spring IOC Container? 23
+In How many ways we can define the configuration in spring? 24
+What is Dependency injection? 24
+Difference between Inversion of Control and Dependency Injection? 25
+What are the types of dependency injection and what benefit we are
+getting using that? 25
+Which one is better Constructor-based or setter-based DI? 26
+What is Method Injection? 27
+How inversion of control works inside the container? 27
+What are different spring modules? 28
+What are Spring MVC, Spring AOP and Spring Core modules? 29
+How Component Scanning(@ComponentScan) Works? 30
+What is ApplicationContext and how to use inside spring? 31
+What is BeanFactory and how to use inside spring? 31
+What is Bean? 31
+What are Bean scopes? 32
+What is the Spring bean lifecycle? 32
+What is the bean lifecycle in terms of application context? 33
+Difference Between BeanFactory and ApplicationContext? 34
+What is default bean scope in spring? 34
+How bean is loaded inside spring, can you tell the difference between
+Lazy loading and Eager loading? 35
+Lazy Loading vs. Eager Loading? (Important interview Question) 35
+How to Specify Lazy Loading and Eager Loading? 35
+How @Autowire annotation works? 36
+What are the Types of Autowiring? 36
+
+GUIDE TO CLEAR SPRING-BOOT MICROSERVICE
+INTERVIEW 2
+How to exclude a Bean from Autowiring? 36
+Difference between @Autowire and @Inject in spring? 36
+Is Singleton bean thread safe? 37
+Difference between Singleton and prototype bean? 37
+What is @Bean annotation in spring? 37
+What is @Configuration annotation? 38
+How to configure Spring profiles? 38
+What is @component and @profile and @value annotation? 38
+What is $ and # do inside @value annotation? 39
+What is the stateless bean in spring? name it and explain it? 39
+How is the bean injected in spring? 40
+How to handle cyclic dependency between beans? 41
+What would you call a method before starting/loading a Spring boot
+application? 42
+How to handle exceptions in the spring framework? 42
+How filter work in spring? 43
+What is DispatcherServlet? 44
+What is @Controller annotation in spring? 45
+How Controller maps appropriate methods to incoming request? 45
+What is the difference between @Controller and @RestController in
+Spring MVC? 47
+Difference between @Requestparam and @Pathparam annotation? 48
+What is session scope used for? 49
+Difference between @component @Service @Controller @Repository
+annotation in Spring? 49
+Spring-MVC flow in detail? 49
+What is the most common Spring MVC annotations? 51
+Can singleton bean scope handle multiple parallel requests? 52
+Tell me the Design pattern used inside the spring framework. 52
+How do factory design patterns work in terms of the spring
+framework? 53
+How the proxy design pattern is used in spring? 54
+What if we call singleton bean from prototype or prototype bean from
+singleton How many objects returned? 55
+Spring boot vs spring why choose one over the other? 56
+
+GUIDE TO CLEAR SPRING-BOOT MICROSERVICE
+INTERVIEW 3
+What is RestTemplate in spring? 57
+What are all HTTP Clients Available in Spring and Spring Boot? 58
+What is an HttpMessageConverter in Spring REST? 58
+How to consume RESTful Web Service using Spring MVC? 58
+Chapter 2: Spring-Boot 60
+What is Spring Boot and its Benefits? 60
+Difference between Spring Framework and Spring Boot 60
+What are Spring Boot Starters & Explain about different starter
+dependencies of Spring-boot? 61
+Describe spring-boot-starter-parent? 62
+What is Auto-Configuration? 62
+How does auto-configuration work? How does it know what to
+configure? 63
+What are DevTools in Spring Boot? 63
+What does @EnableAutoConfiguration annotation do? 63
+How does the @SpringBootApplication annotation work internally? 64
+What are some common Spring Boot Annotations? 64
+Difference between @RestController and @Controller annotations 65
+Difference between @RequestMapping and @GetMapping? 65
+What is the use of @Configuration? 66
+What is AutoWiring? 66
+What is @Transactional annotation? 67
+How to use property defined in application properties in java class? 67
+Purpose of using @ComponentScan in the class files? 67
+How to disable AutoConfguration for a specific class? 68
+What are the uses of Spring-Boot Profiles? 68
+How to set active profiles in Spring-boot? 69
+How to implement swagger in Spring-Boot? 69
+What is Spring-Batch? 70
+How to implement pagination and sorting in Spring-Boot? 72
+How to implement exception handling in Spring-boot? 74
+How to implement interceptors in spring-boot? 76
+How to override and replace tomcat embedded server? 78
+What is Spring Boot dependency management? 80
+
+GUIDE TO CLEAR SPRING-BOOT MICROSERVICE
+INTERVIEW 4
+Is it possible to create a non-web application in Spring Boot? 80
+How to change the port of the embedded Tomcat server in Spring
+Boot? 80
+What is the default port of tomcat in spring boot? 80
+How HTTPS requests flow through the Spring Boot application? 80
+What is Spring Actuator? What are its advantages? 81
+How to enable Actuator in spring boot application? 81
+How to secure Spring Boot Actuator's endpoints? 83
+How to create a custom endpoint in Spring Boot Actuator? 83
+What do you understand by the shutdown in the actuator? 84
+Mention the possible sources of external configuration 85
+Can you explain what happens in the background when a Spring Boot
+Application is “Run as Java Application”? 86
+What is thyme-leaf and how to use thymeleaf? 86
+How to enable HTTP/2 support in Spring Boot? 87
+
+What is Spring Boot CLI and how to execute the Spring Boot project-
+using boot CLI? 87
+
+Differences between @SpringBootApplication and
+@EnableAutoConfiguration annotation? 88
+What is the best way to expose custom application configuration with
+Spring Boot? 88
+What is graceful shutdown in Spring-Boot? 88
+What is @Async in Spring Boot? 89
+Which one is better YAML file or Properties file and the different ways
+to load the YAML file in Spring boot. 90
+Explain how to register a custom auto-configuration? 90
+How do you Configure Log4j for logging? 91
+How to instruct an auto-configuration to back off when a bean exists?
+92
+What are the dependencies needed to start up a JPA Application and
+connect to in-memory database H2 with Spring Boot? 92
+What is Spring Boot relaxed binding? 93
+Where the database config is specified and how does it automatically
+connect to H2? 94
+What is Spring Initializer? 95
+
+GUIDE TO CLEAR SPRING-BOOT MICROSERVICE
+INTERVIEW 5
+How to configure the Logger(logging) in Spring Boot? How to change
+default logging level? 96
+How to load multiple external configuration or properties files? 96
+How to use the custom spring boot parent POM? 97
+How to change the default context path in Spring Boot? 97
+How to deploy Spring Boot application as a WAR? 98
+How to customize the default Spring Security in Spring Boot? 99
+How to configure two databases and two EntityManager in Spring
+Boot? 100
+How to customize the support for multiple content-negotiation for
+returning XML or JSON? 101
+How to register Servlet, Filter and Listener in Spring Boot? 102
+How spring-boot helps in Microservice development? 103
+Difference between @Service and @Repository annotation? 104
+Difference between @PathParam and @RequestParam and
+@QueryParam annotation? 104
+Meaning of http status code 404,403, 401,500,502 etc . 105
+What is the usage of the "@Primary" annotation? 105
+How to handle Exceptions in Spring Boot Microservices? 105
+Which Bean scope takes a lot of computational memory? 106
+Difference between @Inject and @Autowire? 106
+How to write Spring boot custom annotation or any custom annotation
+in Java? 106
+What kind of exceptions you have seen in the Springboot project? 107
+What is an alternative to spring boot application annotation? 107
+Write a file upload end-point in Springboot? 108
+How to trace a request in spring-boot? 109
+What is spring boot CLI? 109
+What are Embedded server in Springboot? 109
+How to embed different server instead of default tomcat server inside
+spring-boot? 110
+How springboot find and configure the beans and configuration? 110
+Chapter 3: Spring Boot-Data JPA 112
+What is Spring Data JPA? 112
+What are the benefits of using Spring Data JPA? 112
+
+GUIDE TO CLEAR SPRING-BOOT MICROSERVICE
+INTERVIEW 6
+Differences between JPA and Hibernate? 112
+What is the Spring data repository? 112
+Can we perform actual tasks like access, persist, and manage data
+with JPA? 113
+What are the different types of JPA entities? 113
+How can we create a custom repository in Spring data JPA? 113
+What are the different types of queries in JPA? 113
+Explained different JPA Annotations? 114
+What is a Spring Data JPA repository? 115
+What is PagingAndSortingRepository? 115
+What is @Query used for? 115
+What is the difference between CrudRepository vs JPARespository? 115
+Difference between findById() and getOne()? 116
+What are the benefits of using Spring Data JPA repositories? 116
+What happens when you don’t annotate the JPA repository with
+@Repository annotation? 116
+Why to use spring data JPA, why go for native queries? 117
+Difference between Entity manager and JPA repository? 117
+How to Handle Relationships between Entities: 117
+How to Connect to a Database Using Spring Boot 118
+How to fetch 10k records using pagination? 118
+How to connect multiple DB in spring-boot? 119
+Write a code to store employees using Spring Data JPA, What is the
+correct way to do it? 121
+How datasource/database is configured inside spring boot? 123
+How will you establish a connection using a JDBC driver? 124
+How do you fire queries while using JDBC? 125
+What are the different methods available in Spring Data JPA
+repositories? 126
+How can you create custom queries in Spring Data JPA repositories?127
+Can we write a JPA query to sort employees based on employee names
+using Spring Data-JPA? 127
+Writing a Simple Spring Data JPA Application? 128
+Lazy and Eager Loading in Hibernate? 129
+Why Implementing JPA Caching? 129
+
+GUIDE TO CLEAR SPRING-BOOT MICROSERVICE
+INTERVIEW 7
+What are some common errors encountered with Spring Data JPA? 129
+How to store passwords safely in the database? 131
+What are the steps to connect the Spring Boot application to a
+database using JDBC? 132
+What are the steps to connect an external database like MySQL or
+Oracle? 133
+What’s the error occurs when H2 is not in the class path? 133
+How to test only the database layer (JPA) in Spring Boot? 133
+What is Entity Manager in JPA? 134
+Chapter 4: Spring Boot-Security 136
+What is Spring Security and its core features? 136
+How form based authentication works within Spring Security? 137
+What is Basic Authentication in Spring Security? 138
+How does Spring Security use filters to secure applications? 138
+How would you secure your REST APIs with Spring Security? 139
+Explain the concept of multi-factor authentication (MFA) and how to
+integrate it with Spring Security. 140
+How do you implement OAuth2/OpenID Connect for social logins in
+your Spring Boot application? 141
+How to secure an API? 142
+How to implement security via Api gateway in using microservices? 142
+What is Spring authentication and authorisation? 144
+How to disable the Spring Security in Spring Boot application? 145
+Explain JSON Web Token (JWT)? 146
+What is Oauth2.0 and its components and flow in terms of Restful
+Webservice? 147
+What Can an OAuth Token Do? 148
+What are the Authentication Mechanisms? 148
+What are those terminologies (Session, Cookie, JWT, Token, SSO, and
+OAuth 2.0)? 148
+What is SSO (Single Sign-On (SSO)? 149
+How to implement JWT authentication for springboot application? 150
+Explain how you would secure a Spring Boot application that exposes
+sensitive data through REST APIs? 151
+Chapter 5: Spring Cloud 152
+What is Spring Cloud? 152
+
+GUIDE TO CLEAR SPRING-BOOT MICROSERVICE
+INTERVIEW 8
+What are the Different components of Spring Cloud? 153
+Spring Boot Key Concepts Explained: 154
+What is Eureka server? 156
+What is the need for Eureka? 158
+How different is Eureka from AWS ELB? 158
+What is Eureka client? 158
+What is Netflix hystrix and its Uses? 159
+What is the resiliancy4j library? 160
+Give us the Load balancer example in spring cloud? 160
+What are some common Spring cloud annotations? 161
+Difference between Ribbon and Zuul in Spring Cloud? 161
+What is Api gateway in spring cloud? 162
+What is the difference between service discovery and API Gateway?162
+How does Spring Cloud achieve configuration management and
+different types of configuration sources available? 163
+How the spring cloud config will look like, give us with code example?
+164
+What is Circuit breaker pattern, role of Hystrix in Spring Cloud and its
+benefits? 165
+How to Construct and Execute an Hystrix command with example? 167
+How do you handle distributed tracing in Spring Cloud? 167
+What are the different monitoring and logging solutions available? 169
+How can you secure your Spring Cloud applications? 171
+How can you achieve high availability and fault tolerance in your
+microservices? 172
+How do you implement a Spring Cloud Config Server with Git backend?
+173
+
+Describe a scenario where you used circuit breaker pattern
+effectively? 175
+Explain how you would implement an API Gateway with Spring Cloud
+Gateway? 176
+Chapter 6: Spring-Boot With AWS 178
+What are the benefits of using Spring Boot with AWS? 178
+Explain the different ways to deploy Spring Boot applications on AWS.
+178
+
+GUIDE TO CLEAR SPRING-BOOT MICROSERVICE
+INTERVIEW 9
+Describe the different AWS services that can be used with Spring Boot
+applications? 179
+How can you implement security and authentication for Spring Boot
+applications on AWS? 180
+How do you handle monitoring and logging for Spring Boot
+applications on AWS? 180
+Amazon Elastic Compute Cloud (EC2) 182
+How do you configure EC2 instances to run Spring Boot applications?
+182
+How do you leverage Auto Scaling to manage EC2 instances for your
+application? 183
+Amazon Simple Storage Service (S3): 183
+How do you use S3 for storing Spring Boot application artifacts and
+static files? 183
+How do you integrate S3 with Spring Boot applications for data
+access? 185
+Amazon Relational Database Service (RDS): 186
+How do you configure RDS instances for your Spring Boot
+application's database? 186
+How do you connect your Spring Boot application to an RDS
+database? 187
+Amazon Simple Queue Service (SQS): 188
+How do you use SQS for asynchronous messaging in your Spring
+Boot application? 188
+AWS Lambda: 189
+How can you deploy Spring Boot applications as serverless functions
+on AWS Lambda? 189
+What are the benefits and drawbacks of using AWS Lambda for
+Spring Boot applications? 190
+Write a program to upload a file in an s3 bucket using Springboot? 191
+Chapter 7: Spring Boot-Testing 193
+What is Unit and Integrated testing? 193
+In how many ways we can Test an API? 193
+What are the three common Spring boot test annotations are? 194
+How Mockito and EasyMock Help Your Spring Boot Tests? 195
+What is the difference between @SpringBootTest and @WebMvcTest
+annotations? 195
+
+GUIDE TO CLEAR SPRING-BOOT MICROSERVICE
+INTERVIEW 10
+How do you mock external dependencies in Spring Boot tests? 197
+Explain how to mock JPA repositories in unit tests? 197
+What are some common integration testing frameworks used with
+Spring Boot? 198
+Design and implement unit tests for a Spring Boot service that
+interacts with a database? 198
+When do you use @DataJpaTest? 199
+What are the latest trends and best practices in Spring Boot testing?
+199
+Chapter 8: Spring Boot-Caching 200
+What is caching? 200
+What are the different types of caches supported by Spring Boot? 200
+Write a Controller class which supports caching? 200
+What are the most commonly used caching annotations in Spring
+Boot? 200
+How to configure caching in Spring Boot applications? 201
+What are the benefits of caching with Spring and Redis? 201
+What caching strategies are available in Spring and Redis? 201
+How can Spring be used with Redis for caching? 202
+How to configure caching with Spring Boot and Redis? 202
+What are some common challenges with caching? 202
+What are some best practices for using caching with Spring and Redis?
+202
+Redis vs Memcached 202
+Chapter 9: Spring Reactive Programming 204
+What is reactive programming in terms of spring? 204
+Differences between reactive and traditional blocking approaches: 205
+What are the different reactive programming frameworks available?
+(e.g., Spring WebFlux, RxJava) 206
+What is Spring WebFlux? 206
+How is Spring WebFlux different from Spring MVC? 207
+What are the main Components of Spring WebFlux? 207
+How to create a Reactive Web Service with Spring WebFlux? 207
+How to Handle Errors in Spring WebFlux? 207
+Chapter 10: Microservice 209
+
+GUIDE TO CLEAR SPRING-BOOT MICROSERVICE
+INTERVIEW 11
+What is Microservices? 209
+What are the key characteristics of Microservices architecture? 209
+What are the advantages of Microservices? 210
+What are the drawbacks of Microservices? 211
+Difference between Microservices and monolithic architecture? 211
+What are the design principles of Microservices? 213
+What are the different types of communication protocols used in
+Microservices? 214
+How to handle failures in microservice environments assuming one
+microservice is down and not responding? 215
+Suppose you have to migrate an existing monolithic application to
+microservices? What will be your approach? 216
+What is Service discovery and Api gateway in microservices? 217
+How to implement Service discovery and Api gateway for your
+microservices? 218
+What is the significance of Api gateway in microservice? 219
+How to implement distributed logging in a microservices architecture?
+220
+How to handle transactions in microservices architecture? 221
+How will you implement security in microservices, what will be your
+approach? 222
+Explain the circuit breaker concept and how to implement it? 223
+Which library can we use to implement? 223
+Explain the Spring-Boot annotations for Circuit-Breaker’s 224
+What is the advantage of microservices using Spring Boot Application
++ Spring Cloud? 225
+Which design patterns are used for database design in microservices?
+225
+Explain the Choreography concept in microservice? 226
+Difference between API Gateway and Load Balancer in Microservices?
+226
+Difference between SAGA and CQRS Design Patterns in Microservices?
+227
+Which Microservice design pattern you have used so far and why? 227
+
+Which Microservice pattern will you use for read-heavy and write-
+heavy applications? 228
+
+What circuit breaker pattern have you used it? 228
+
+GUIDE TO CLEAR SPRING-BOOT MICROSERVICE
+INTERVIEW 12
+What are the examples of it? 228
+How to call other microservice asynchronously? 228
+How to ensure inter-service communication and data integrity in
+microservices? 229
+What are Scaling Strategies that can be used in microservice
+architecture? 229
+How to cope up with increased traffic on your microservice? How to
+employ vertical and horizontal scaling and under what circumstances
+each approach is preferable? 230
+What are types of Load Balancing Logic out there? 231
+How to detect and addressing performance bottlenecks within a
+microservices architecture? 232
+What are all the advantages of using containers for microservices?
+What challenges might arise when managing a containerized
+microservices ecosystem? 232
+How Kubernetes simplifies deployment, scaling, and management of
+microservices? 233
+What is Fault Tolerance and Resilience in microservice? 234
+How to design microservice to gracefully handle failures, prevent
+cascading failures, and recover from disruptions? 235
+What are the challenges in ensuring security for Microservices-based
+applications, particularly when services communicate over public
+networks? 236
+How to diagnose/trace problems within a complex microservices
+architecture? 237
+How do Microservices improve scalability and maintainability? 238
+What is Service-Oriented Architecture (SOA)? 238
+SOA vs. Microservices 239
+Microservices vs Serverless: What’s The Difference? 239
+What are the key tools and technologies used in Microservices
+architecture? 240
+How do Microservices enable DevOps? 241
+What are the different deployment strategies for Microservices? 241
+How do Microservices enable Continuous Integration and Continuous
+Deployment (CI/CD)? 241
+What are some common design patterns used in Microservices
+architecture? 241
+What are some strategies for securing Microservices? 241
+
+GUIDE TO CLEAR SPRING-BOOT MICROSERVICE
+INTERVIEW 13
+How do Microservices impact database design? 241
+What is the role of API gateways in Microservices architecture? 242
+How do Microservices fit into a cloud-native architecture? 242
+What is idempotency in microservice architecture? 242
+How do you handle 100+ Microservices efficiently? 243
+How do you conclude if an application needs Microservices or
+monolith. Pros and cons of both approaches? 243
+What does a typical microservice architecture look like? 243
+How do microservices collaborate and interact with each other? 245
+What is Saga distributed transactions pattern? 246
+What is Choreography and orchestration in SAGA? 248
+What is circuit breaker design pattern with problem statement? 250
+What is configuration management? 251
+Chapter 11: REST 253
+What is a webservice? 253
+What is REST? 253
+What are Key principles of REST? 253
+Why Rest is stateless? 254
+How to secure REST? 254
+Advantage and Disadvantage of using REST webservice? 254
+What is Spring Data REST? 255
+Explain how to configure Spring Data REST with JPA repositories? 255
+Design and implement a REST API for managing user data using
+Spring Data REST? 256
+What is RestTemplate in Spring? 258
+What is CRUD operation in REST? 258
+How to improve API performance? 258
+SOAP vs REST vs GraphQL vs RPC. 259
+What are HTTP methods used in REST? 259
+What is Idempotency? Explain about Idempotent methods? 260
+Difference between PUT and PATCH HTTP method? 260
+What are HTTP error codes? 261
+What happens when you type a URL into a browser? 261
+Chapter 12: System Design in terms of Spring-Boot, Microservices 263
+
+GUIDE TO CLEAR SPRING-BOOT MICROSERVICE
+INTERVIEW 14
+Describe the architecture of your Spring Boot microservices
+application. How have you separated your concerns and implemented
+communication between services? 263
+How have you designed your microservices for scalability and
+resilience? How will your application handle increased load or service
+failures? 264
+How do you handle data consistency across multiple microservices?
+What approach do you use for distributed transactions? 265
+How do you monitor and manage your microservices in production?
+What tools and technologies do you use for monitoring and logging?265
+How have you chosen the right database for each microservice? What
+factors did you consider? 266
+What messaging technologies have you used for communication
+between services? Why did you choose these technologies? 266
+How have you handled configuration management for your
+microservices? How do you ensure consistent configuration across all
+environments? 267
+How have you implemented security and authorization in your
+microservices architecture? What challenges did you face and how did
+you overcome them? 267
+How have you designed your microservices for fault tolerance and
+disaster recovery? What mechanisms do you have in place to handle
+service outages or data loss? 267
+How do you handle high traffic spikes for a specific microservice?
+What strategies do you have in place to scale horizontally or
+vertically? 269
+How do you debug and troubleshoot issues within your microservices
+architecture? What tools and techniques do you use? 270
+How do you migrate your existing monolithic application to a
+microservices architecture? What are the key challenges you need to
+consider? 270
+How do you handle API versioning and backwards compatibility in
+your microservices? 272
+What are some emerging trends in microservices architecture? 272
+How to Design Gmail on high level? 273
+Chapter 13: Spring-Boot/Microservice Scenario Based Questions 274
+How to implement a query that retrieves data from multiple services in
+a microservice architecture? 274
+What are the challenging things you have done so far Technically and
+professionally? 275
+
+GUIDE TO CLEAR SPRING-BOOT MICROSERVICE
+INTERVIEW 15
+Which cache have you used so far and why? 276
+Write a program to build cache from scratch using java? 276
+How to resolve conflicts while pushing code in Git? 278
+How to make a call from cloud environment to on prem environment?
+278
+How to migrate 1 TB of on prem data to Google cloud? 279
+How do you rollback transactions in few Microservices alone? 280
+How to scale a website to support millions of users? 282
+Chapter 13: Message Broker/Middleware 284
+What are message brokers and their role in Spring Boot applications?
+284
+What are middleware components in Spring Boot? 284
+List some common middleware components used with Spring Boot. 284
+How does Spring Boot integrate with middleware components? 284
+Difference between Kafka vs RabbitMQ vs IBM MQ? 285
+Chapter 15: Cloud Knowledge 286
+What is IaaS/PaaS/SaaS? 286
+What is CDN? 287
+Reverse proxy vs. API gateway vs. load balancer 288
+How does AWS Lambda work behind the scenes? 289
+Vertical partitioning and Horizontal partitioning 290
+How API-Gateway works? 292
+Internet traffic routing policies 292
+Chapter 16: Knowledge Base (Miscellaneous) 294
+What do these acronyms mean - CAP, BASE, SOLID, KISS? 294
+Chapter 17: CI-CD/Kubernetes/Devops/Git 295
