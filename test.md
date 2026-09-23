@@ -1,698 +1,208 @@
-Absolutely. Given what oOh! told you — **"very simple problem", reasoning, <10 lines, TypeScript, no AI** — I would now stop learning syntax and do **7 timed problems**.
-
-Don't look for fancy algorithms. These are deliberately the kind of small problems where your real-world engineering instincts should be enough.
-
-## Round 1 — Warm-up
-
-### Problem 1 — Filter + Map
-
-Given:
-
-```ts
-const customers = [
-    { cif: "C100", status: "ACTIVE" },
-    { cif: "C200", status: "PENDING" },
-    { cif: "C300", status: "ACTIVE" },
-    { cif: "C400", status: "CLOSED" }
-];
-```
-
-Return the CIFs of all `ACTIVE` customers.
-
-Expected:
-
-```text
-["C100", "C300"]
-```
-
-Function:
-
-```ts
-function getActiveCifs(customers: ???): string[] {
-    // ...
-}
-```
-
-**Target time: 2 minutes**
-
----
-
-# Problem 2 — Find
-
-Given:
-
-```ts
-const customers = [
-    { cif: "C100", name: "John" },
-    { cif: "C200", name: "Sarah" },
-    { cif: "C300", name: "Mike" }
-];
-```
-
-Find the customer with CIF `"C200"`.
-
-Return the customer object, or `undefined` if it doesn't exist.
-
-Expected:
-
-```ts
-{ cif: "C200", name: "Sarah" }
-```
-
-Function:
-
-```ts
-function findCustomer(customers: ???, cif: string) {
-    // ...
-}
-```
-
-**Target time: 2 minutes**
-
----
-
-# Problem 3 — Sum
-
-Given:
-
-```ts
-const transactions = [
-    { amount: 100, status: "SUCCESS" },
-    { amount: 50, status: "FAILED" },
-    { amount: 200, status: "SUCCESS" },
-    { amount: 75, status: "SUCCESS" }
-];
-```
-
-Return the total amount of successful transactions.
-
-Expected:
-
-```text
-375
-```
-
-Function:
-
-```ts
-function successfulTotal(transactions: ???): number {
-    // ...
-}
-```
-
-**Target time: 3 minutes**
-
-You've essentially already solved this one, so this should be quick.
-
----
-
-# Problem 4 — Remove duplicates
-
-Given:
-
-```ts
-const cifs = [
-    "C100",
-    "C200",
-    "C100",
-    "C300",
-    "C200",
-    "C400"
-];
-```
-
-Return unique CIFs.
-
-Expected:
-
-```text
-["C100", "C200", "C300", "C400"]
-```
-
-Function:
-
-```ts
-function uniqueCifs(cifs: string[]): string[] {
-    // ...
-}
-```
-
-**Target time: 2 minutes**
-
----
-
-# Problem 5 — First duplicate
-
-Given:
-
-```ts
-const ids = [
-    "A",
-    "B",
-    "C",
-    "D",
-    "C",
-    "B"
-];
-```
-
-Return the **first duplicate encountered**.
-
-Expected:
-
-```text
-"C"
-```
-
-If there is no duplicate:
-
-```text
-undefined
-```
-
-Function:
-
-```ts
-function firstDuplicate(ids: string[]): string | undefined {
-    // ...
-}
-```
-
-**Target time: 4 minutes**
-
-This is where I want you to think about **Set vs Map**.
-
----
-
-# Problem 6 — Group/count
-
-This is probably the most useful one for you given the type of systems you work with.
-
-Given:
-
-```ts
-const documents = [
-    "PASSPORT",
-    "UTILITY_BILL",
-    "PASSPORT",
-    "DRIVER_LICENCE",
-    "PASSPORT",
-    "UTILITY_BILL"
-];
-```
-
-Return the number of times each document type occurs.
-
-Expected:
-
-```text
-PASSPORT        3
-UTILITY_BILL    2
-DRIVER_LICENCE  1
-```
-
-You can return:
-
-```ts
-Map<string, number>
-```
-
-Function:
-
-```ts
-function countDocuments(documents: string[]): Map<string, number> {
-    // ...
-}
-```
-
-**Target time: 5 minutes**
-
-You already wrote almost exactly this earlier.
-
----
-
-# Problem 7 — The mock interview problem
-
-This is the one I'd actually use as your final test.
-
-You receive events:
-
-```ts
-const events = [
-    { userId: "U1", status: "FAILED" },
-    { userId: "U2", status: "SUCCESS" },
-    { userId: "U1", status: "SUCCESS" },
-    { userId: "U3", status: "FAILED" },
-    { userId: "U2", status: "SUCCESS" },
-    { userId: "U4", status: "SUCCESS" }
-];
-```
-
-Return the IDs of users who have **at least one successful event**, without duplicates.
-
-Expected:
-
-```text
-["U2", "U1", "U4"]
-```
-
-Function:
-
-```ts
-function successfulUsers(events: ???): string[] {
-    // ...
-}
-```
-
-**Target time: 5 minutes**
-
----
-
-# 🎯 How I want you to practise these
-
-Don't do what developers often do when they know the answer:
-
-> "Oh, that's easy. `filter().map()`."
-
-Instead, **talk yourself through the shape**.
-
-For example:
-
-### Problem 7
-
-You should think:
-
-> I only care about SUCCESS → `filter`.
-
-Then:
-
-> I need the userId → `map`.
-
-Then:
-
-> I don't want duplicates → `Set`.
-
-So:
-
-```text
-filter → map → Set → array
-```
-
-That's the reasoning they're actually testing.
-
----
-
-# ⏱️ Your 25-minute mock
-
-Do these in order:
-
-| Problem   |       Time |
-| --------- | ---------: |
-| 1         |      2 min |
-| 2         |      2 min |
-| 3         |      3 min |
-| 4         |      2 min |
-| 5         |      4 min |
-| 6         |      5 min |
-| 7         |      5 min |
-| **Total** | **23 min** |
-
-Then spend **5 minutes reviewing**.
-
-Don't Google anything.
-
-If you get stuck, **don't immediately ask me**. Give yourself the full time.
-
----
-
-Yes. Let's step up to **10 medium problems**, but still keep them aligned with the oOh! interview: practical reasoning, TypeScript, small implementation, no LeetCode gymnastics.
-
-**Don't look for the solution immediately.** For each one, first identify the data structure / array operation you need.
-
----
-
-# 1. Highest transaction
-
-Given:
-
-```ts
-const transactions = [
-    { id: "T1", amount: 100 },
-    { id: "T2", amount: 450 },
-    { id: "T3", amount: 200 },
-    { id: "T4", amount: 300 }
-];
-```
-
-Return the transaction with the highest amount.
-
-Expected:
-
-```ts
-{ id: "T2", amount: 450 }
-```
-
-```ts
-function highestTransaction(transactions: ???) {
-    // ...
-}
-```
-
-**Think:** `reduce`?
-
----
-
-# 2. Average successful transaction
-
-```ts
-const transactions = [
-    { amount: 100, status: "SUCCESS" },
-    { amount: 50, status: "FAILED" },
-    { amount: 200, status: "SUCCESS" },
-    { amount: 300, status: "SUCCESS" }
-];
-```
-
-Return the average amount of successful transactions.
-
-Expected:
-
-```text
-200
-```
-
-```ts
-function averageSuccessful(transactions: ???): number {
-    // ...
-}
-```
-
-**Think:** filter + reduce.
-
----
-
-# 3. Most frequent document
-
-```ts
-const documents = [
-    "PASSPORT",
-    "UTILITY_BILL",
-    "PASSPORT",
-    "DRIVER_LICENCE",
-    "PASSPORT",
-    "UTILITY_BILL"
-];
-```
-
-Return the document type that appears most frequently.
-
-Expected:
-
-```text
-"PASSPORT"
-```
-
-```ts
-function mostFrequent(documents: string[]): string {
-    // ...
-}
-```
-
-**Think:** `Map` + counting.
-
----
-
-# 4. Group customers by status
-
-Given:
-
-```ts
-const customers = [
-    { cif: "C100", status: "ACTIVE" },
-    { cif: "C200", status: "PENDING" },
-    { cif: "C300", status: "ACTIVE" },
-    { cif: "C400", status: "CLOSED" },
-    { cif: "C500", status: "ACTIVE" }
-];
-```
-
-Return:
-
-```ts
-{
-    ACTIVE: ["C100", "C300", "C500"],
-    PENDING: ["C200"],
-    CLOSED: ["C400"]
-}
-```
-
-```ts
-function groupByStatus(customers: ???) {
-    // ...
-}
-```
-
-**Think:** `Map` or object accumulator.
-
----
-
-# 5. Find missing IDs
-
-You have expected document IDs:
-
-```ts
-const expected = ["D1", "D2", "D3", "D4", "D5"];
-```
-
-But the system actually returned:
-
-```ts
-const received = ["D1", "D3", "D5"];
-```
-
-Return:
-
-```text
-["D2", "D4"]
-```
-
-```ts
-function findMissing(expected: string[], received: string[]): string[] {
-    // ...
-}
-```
-
-**Think:** `Set` + `filter`.
-
----
-
-# 6. Find users with multiple successful events
-
-```ts
-const events = [
-    { userId: "U1", status: "SUCCESS" },
-    { userId: "U2", status: "SUCCESS" },
-    { userId: "U1", status: "SUCCESS" },
-    { userId: "U3", status: "FAILED" },
-    { userId: "U2", status: "FAILED" },
-    { userId: "U1", status: "SUCCESS" }
-];
-```
-
-Return users who have **more than one successful event**.
-
-Expected:
-
-```text
-["U1"]
-```
-
-```ts
-function usersWithMultipleSuccesses(events: ???): string[] {
-    // ...
-}
-```
-
-**Think:** this is a `Map` counting problem.
-
----
-
-# 7. Merge records by ID
-
-You receive customer information from two systems:
-
-```ts
-const customers = [
-    { id: "C1", name: "John" },
-    { id: "C2", name: "Sarah" }
-];
-
-const statuses = [
-    { id: "C1", status: "ACTIVE" },
-    { id: "C2", status: "PENDING" }
-];
-```
-
-Return:
-
-```ts
-[
-    { id: "C1", name: "John", status: "ACTIVE" },
-    { id: "C2", name: "Sarah", status: "PENDING" }
-]
-```
-
-```ts
-function mergeCustomers(customers: ???, statuses: ???) {
-    // ...
-}
-```
-
-**Think:** `Map` is probably your friend.
-
-This is a particularly useful one for you because it's very close to the **CIF → object ID → KYC** type of data joining you discuss in your system designs.
-
----
-
-# 8. Find first non-duplicate
-
-Given:
-
-```ts
-const ids = ["A", "B", "C", "B", "A", "D", "C"];
-```
-
-Return the **first ID that appears only once**.
-
-Expected:
-
-```text
-"D"
-```
-
-```ts
-function firstUnique(ids: string[]): string | undefined {
-    // ...
-}
-```
-
-**Think carefully.**
-
-You probably need **two passes** or a `Map`.
-
-Don't try to be clever.
-
----
-
-# 9. Top two transactions
-
-Given:
-
-```ts
-const transactions = [
-    { id: "T1", amount: 100 },
-    { id: "T2", amount: 500 },
-    { id: "T3", amount: 250 },
-    { id: "T4", amount: 400 }
-];
-```
-
-Return the IDs of the two largest transactions.
-
-Expected:
-
-```text
-["T2", "T4"]
-```
-
-```ts
-function topTwo(transactions: ???): string[] {
-    // ...
-}
-```
-
-**Think:** You don't necessarily need to sort.
-
-But sorting is also a perfectly reasonable answer unless the interviewer specifically asks for optimal complexity.
-
----
-
-# 10. KYC processing problem 🔥
-
-This one is designed specifically around your Silent KYC story.
-
-You have:
-
-```ts
-const documents = [
-    { objectId: "O1", type: "PASSPORT", status: "PROCESSED" },
-    { objectId: "O2", type: "UTILITY_BILL", status: "FAILED" },
-    { objectId: "O3", type: "PASSPORT", status: "PROCESSED" },
-    { objectId: "O4", type: "DRIVER_LICENCE", status: "PROCESSING" },
-    { objectId: "O5", type: "UTILITY_BILL", status: "PROCESSED" }
-];
-```
-
-Return the IDs of **processed documents**, but only return **one document ID per document type**.
-
-Expected:
-
-```text
-["O1", "O5"]
-```
-
-Why?
-
-```text
-PASSPORT       → O1
-UTILITY_BILL   → O5
-DRIVER_LICENCE → none
-```
-
-```ts
-function processedDocuments(documents: ???): string[] {
-    // ...
-}
-```
-
-**Think:** `filter` + `Set` or `Map`.
-
----
-
-# 🧠 The important part
-
-These 10 are actually testing a fairly small number of concepts:
-
-| Problem | Main concept              |
-| ------- | ------------------------- |
-| 1       | `reduce`                  |
-| 2       | `filter` + `reduce`       |
-| 3       | `Map`                     |
-| 4       | `Map` / accumulator       |
-| 5       | `Set` + `filter`          |
-| 6       | `Map` counting            |
-| 7       | `Map` lookup / joining    |
-| 8       | `Map` counting            |
-| 9       | `sort` / `reduce`         |
-| 10      | `Set` / `Map` + filtering |
-
-So don't think:
-
-> "I have to learn 10 algorithms."
-
-You're really learning:
-
-**Array → Set → Map → Reduce → combinations of those.**
-
-And that's a very manageable TypeScript interview toolkit.
-
-### One additional thing I'd practise
-
-For each problem, force yourself to say **before coding**:
-
-> **"My input is X, my desired output is Y, so I need to..."**
-
-That will make you look much stronger in the whiteboard exercise because the interviewer gets to see your reasoning rather than watching you silently type.
-
-
-
+Cultural  
+Absolutely. That is probably the best way for you to prepare tonight — I give you the question 
+and only the 2–3 things you need to hit, and you formulate the answer naturally in your own 
+words. 
+I’ll deliberately not write the answers for you. 
+1. Difficult / demanding situation 
+Question: 
+Tell me about one of the most difficult and demanding tasks you've had to complete. 
+Hit these points: 
+● 3 senior developers left + lead went overseas → you became the most experienced 
+person. 
+● Had 3 inexperienced developers → changed from individual contributor to creating 
+structure/support for the team. 
+● UAT was difficult, but you regrouped, developed people and ultimately went live 
+successfully. 
+2. Leadership without authority 
+Question: 
+Tell me about a time you had to lead people without having formal authority. 
+Hit these points: 
+● You weren't formally the manager; you became the de facto lead. 
+● Had to create confidence and direction for inexperienced developers. 
+● Focus on getting the team to succeed, rather than personally solving everything. 
+3. Developing someone 
+Question: 
+Tell me about someone you've helped develop. 
+Hit these points: 
+● The talented junior developer in the 2016 project. 
+● You deliberately allowed him to go to another team despite your own delivery pressure. 
+● He came back with production/go-live experience and helped your team avoid problems. 
+4. Difficult production problem 
+Question: 
+Tell me about a time you had to respond quickly to a production problem. 
+Hit these points: 
+● Database was failing over within minutes. 
+● Investigated what had changed → VACUUM ANALYZE had changed query plans. 
+● Focus on evidence rather than assuming infrastructure was the problem. 
+5. Working with non-technical stakeholders 
+Question: 
+Tell me about a time you had to explain a technical problem to a non-technical stakeholder. 
+Hit these points: 
+● Business expected more documents from the account IDs they supplied. 
+● Used the filing cabinet/folder analogy rather than database terminology. 
+● Discovered their SOP appended additional identifiers → changed search → correct 
+documents found. 
+6. Handling disagreement 
+Question: 
+Tell me about a time someone disagreed with your approach. 
+Hit these points: 
+● Choose either Lambda vs EC2 or the junior developer being loaned out. 
+● Explain why they disagreed — don't portray them as unreasonable. 
+● Explain how you used evidence/reasoning to reach the decision. 
+7. Best recommendation 
+Question: 
+What's one of the best recommendations you've made to a manager, peer or customer? 
+Hit these points: 
+● Existing thinking was EC2. 
+● You looked at actual workload: 15–20 minutes processing, idle otherwise. 
+● Lambda allowed decomposition/scaling and matched the workload characteristics. 
+8. A decision you got wrong 
+Question: 
+Tell me about a decision you got wrong. 
+Hit these points: 
+● Added threading to Lambda as a tactical solution. 
+● It worked initially but didn't scale with growing workload → technical debt. 
+● In hindsight, AWS Batch would have been a better architectural direction; learned to 
+distinguish tactical fix vs long-term architecture. 
+9. Missed deadline 
+Question: 
+Tell me about a time you missed a deadline. 
+Hit these points: 
+● BIS batch: late discovery that 1,000-document testing didn't represent possible 
+4,000-document consumption. 
+● Didn't hide the problem → discussed internally and then transparently with business. 
+● Created a 15-day controlled parallel/soft deployment with old system as fallback. 
+10. Risk management 
+Question: 
+Tell me about a time you took a calculated risk. 
+Hit these points: 
+● BIS deployment rather than stopping everything because of the capacity issue. 
+● Risk was controlled through parallel running and keeping the old system. 
+● Business understood and accepted the risk because the fallback remained available. 
+11. Learning from failure 
+Question: 
+What is something you would do differently today? 
+Hit these points: 
+● Capacity assumptions should have been tested earlier. 
+● Tactical solutions can become technical debt if not explicitly treated as temporary. 
+● You now think more about scale, failure modes and future workload, not just 
+immediate delivery. 
+12. Influencing without authority 
+Question: 
+Tell me about a time you influenced someone without having authority over them. 
+Hit these points: 
+● Pick Lambda/EC2 or business/document story. 
+● Start by understanding their concern rather than immediately arguing. 
+● Use evidence + simple explanation → get alignment. 
+13. When you changed your mind 
+Question: 
+Tell me about a time you changed your mind because of new information. 
+Hit these points: 
+● Could use BIS capacity discovery. 
+● Initial delivery assumption changed after discovering 4,000-document possibility. 
+● Changed the rollout strategy rather than pretending the original plan was still valid. 
+14. Dealing with ambiguity 
+Question: 
+Tell me about a situation where the requirements weren't clear. 
+Hit these points: 
+● Account IDs/document retrieval. 
+● Initial business requirement appeared straightforward. 
+● Instead of arguing over the result, brought business into the room and discovered the 
+hidden SOP rule. 
+15. Handling pressure 
+Question: 
+Tell me about a time you were under significant pressure. 
+Hit these points: 
+● 2016 team: senior people gone + inexperienced team + poor UAT. 
+● You had to keep the team moving rather than becoming consumed by the pressure. 
+● Outcome: production went live quietly despite difficult UAT. 
+16. Conflict within a team 
+Question: 
+Tell me about a time you had to deal with disagreement within a team. 
+Hit these points: 
+● Use the developer-loaning example. 
+● Some questioned sending a strong developer away when your own team was under 
+pressure. 
+● Explain your reasoning: short-term capacity sacrifice for long-term capability and 
+knowledge transfer. 
+17. Customer focus 
+Question: 
+Tell me about a time you went beyond simply delivering the technical solution. 
+Hit these points: 
+● BIS: didn't simply say "we can't handle 4,000." 
+● Designed a business-friendly rollout with fallback. 
+● Balanced technical risk with the business need to get value sooner. 
+Your assessment specifically identifies client service and meeting client needs to high 
+standards as a strength. 
+18. What does Staff Engineer mean to you? 
+Question: 
+What does being a Staff Engineer mean to you? 
+Hit these points: 
+● Impact beyond your own code. 
+● Architecture + technical decisions + influence across teams. 
+● Make good engineering repetitive through patterns, guardrails and better ways of 
+working. 
+19. How do you measure your impact? 
+Question: 
+How do you know you're having an impact as a senior engineer? 
+Hit these points: 
+● Not just lines of code / tickets. 
+● Team makes better decisions and becomes less dependent on you. 
+● Business outcomes: reliability, delivery, reduced risk, performance, faster processing. 
+20. Why Macquarie? 
+Question: 
+Why do you want to work at Macquarie? 
+Hit these points: 
+● Technology is important to the business. 
+● Combination of technical depth + business ownership appeals to you. 
+● Your progression is toward broader technical leadership, architecture and influence. 
+The 5 "Director-level" questions I'd 
+particularly practise 
+These are the ones where I would not give a rehearsed corporate answer. 
+21. What is the biggest mistake you've made as a senior engineer? 
+Hit: 
+● Genuine mistake. 
+● Own it without blaming others. 
+● What specifically changed in your behaviour afterwards. 
+22. What would your manager say you need to improve? 
+Hit: 
+● Don't claim you're perfect. 
+● Pick something around delegation / not jumping too quickly into technical detail. 
+● Show what you're actively doing about it. 
+This is particularly useful given the assessment's comments around leadership, mentoring and 
+influence. 
+23. How do you handle a decision you disagree with? 
+Hit: 
+● Understand the reasoning first. 
+● Present evidence and challenge respectfully. 
+● Once decision is made, commit unless there is a material risk requiring escalation. 
+24. What happens when your team fails? 
+Hit: 
+● Don't immediately look for who caused it. 
+● Understand systemic/root causes. 
+● Own the outcome as the senior person and improve the system. 
+25. Why should we trust you with a Staff-level problem? 
+Hit: 
+● Complex technical problems. 
+● Comfortable with ambiguity and stakeholders. 
+● You take ownership and can bring people together without formal authority. 
+One important thing for tomorrow 
+Your assessment gives you a very useful three-part story: 
+Your strengths: 
+● Above-average verbal reasoning. 
+● Above-average abstract reasoning. 
+● Strong strategic/big-picture orientation. 
+Potential areas they may probe: 
+● Influence. 
+● Leadership/developing others. 
+● Decision-making under uncertainty. 
+● Resilience after setbacks. 
+So if you practise only six stories, I'd choose: 
+1. 2016 team → leadership / pressure / mentoring / resilience 
+2. DB failover → analytical thinking / production judgement 
+3. Account + documents → communication / ambiguity / business partnership 
+4. BIS deployment → risk / missed deadline / stakeholder management 
+5. Lambda vs EC2 → architecture / influence / recommendation 
+6. Lambda threading mistake → failure / self-awareness / learning 
+If you can formulate those six naturally, you can probably adapt them to most of the questions 
+above without sounding like you've memorised 25 answers. 
