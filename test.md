@@ -2,10 +2,6 @@ Absolutely. Below is the **same response converted into `README.md` format**, wi
 
 # Spec-Driven Engineering Preparation
 
-**Target Role:** L5 Senior Java Engineer  
-**Joining Date:** 15 November 2026  
-**Preparation Period:** 11 October – 14 November 2026  
-**Duration:** 35 days
 
 ---
 
